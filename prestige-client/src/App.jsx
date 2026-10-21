@@ -10,6 +10,7 @@ import ItemDetails from './pages/ItemDetails';
 import ReportItems from './pages/ReportItems';
 import Posted from './pages/Posted';
 import Profile from './pages/Profile';
+import Venues from './pages/Venues';
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
       <Route path="/items/:id" element={<ItemDetails />} />
       <Route path="/posted" element={<Posted />} />
       <Route path="/profile" element={<Profile />} />
+      <Route path="/venues" element={<Venues />} />
     </Routes>
   );
 }

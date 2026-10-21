@@ -20,6 +20,9 @@ const pool = mysql.createPool({
 
 const JWT_SECRET = process.env.JWT_SECRET || "prestige-development-secret";
 
+// Upstream partner (set in .env, never hardcoded)
+const PARTNER_URL = process.env.PARTNER_URL;
+
 // =========================
 // AUTH MIDDLEWARE
 // =========================
@@ -58,14 +61,8 @@ app.get("/api/health", (req, res) => {
 
 app.post("/api/auth/register", async (req, res) => {
   try {
-    const {
-      name,
-      studentId,
-      school,
-      email,
-      password,
-      confirmPassword,
-    } = req.body;
+    const { name, studentId, school, email, password, confirmPassword } =
+      req.body;
 
     if (
       !name ||
@@ -139,10 +136,7 @@ app.post("/api/auth/login", async (req, res) => {
 
     const user = rows[0];
 
-    const passwordMatch = await bcrypt.compare(
-      password,
-      user.password
-    );
+    const passwordMatch = await bcrypt.compare(password, user.password);
 
     if (!passwordMatch) {
       return res.status(401).json({
@@ -219,12 +213,7 @@ app.get("/api/items", async (req, res) => {
 
       const searchValue = `%${search}%`;
 
-      params.push(
-        searchValue,
-        searchValue,
-        searchValue,
-        searchValue
-      );
+      params.push(searchValue, searchValue, searchValue, searchValue);
     }
 
     sql += " ORDER BY created_at DESC";
@@ -241,15 +230,53 @@ app.get("/api/items", async (req, res) => {
 });
 
 // =========================
+// CLAIMED ITEMS (Team 6)
+// NOTE: must stay ABOVE /api/items/:id, otherwise Express
+// treats the word "claimed" as an item ID.
+// =========================
+
+app.get("/api/items/claimed", async (req, res) => {
+  try {
+    const { studentId } = req.query;
+
+    let sql = `
+      SELECT
+        items.id,
+        items.title,
+        items.reward_amount,
+        items.status,
+        items.student_id
+      FROM items
+      WHERE items.status = 'CLAIMED'
+    `;
+
+    const params = [];
+
+    if (studentId) {
+      sql += " AND items.student_id = ?";
+      params.push(studentId);
+    }
+
+    const [rows] = await pool.query(sql, params);
+
+    res.json(rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      error: "Failed to fetch claimed items",
+    });
+  }
+});
+
+// =========================
 // SINGLE ITEM
 // =========================
 
 app.get("/api/items/:id", async (req, res) => {
   try {
-    const [rows] = await pool.query(
-      "SELECT * FROM items WHERE id = ?",
-      [req.params.id]
-    );
+    const [rows] = await pool.query("SELECT * FROM items WHERE id = ?", [
+      req.params.id,
+    ]);
 
     if (rows.length === 0) {
       return res.status(404).json({
@@ -319,6 +346,40 @@ app.post("/api/items", authenticateToken, async (req, res) => {
 });
 
 // =========================
+// CLAIMS ON MY POSTED ITEMS
+// =========================
+
+app.get("/api/items/:id/claims", authenticateToken, async (req, res) => {
+  try {
+    const [items] = await pool.query("SELECT * FROM items WHERE id = ?", [
+      req.params.id,
+    ]);
+
+    if (items.length === 0) {
+      return res.status(404).json({ error: "Item not found" });
+    }
+
+    if (items[0].student_id !== req.user.id) {
+      return res.status(403).json({ error: "You did not post this item" });
+    }
+
+    const [claims] = await pool.query(
+      `SELECT claims.*, users.full_name AS claimant_name
+       FROM claims
+       JOIN users ON claims.student_id = users.id
+       WHERE claims.item_id = ?
+       ORDER BY claims.created_at DESC`,
+      [req.params.id]
+    );
+
+    res.json(claims);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch claims for this item" });
+  }
+});
+
+// =========================
 // CLAIM ITEM
 // =========================
 
@@ -332,10 +393,9 @@ app.post("/api/claims", authenticateToken, async (req, res) => {
       });
     }
 
-    const [items] = await pool.query(
-      "SELECT * FROM items WHERE id = ?",
-      [itemId]
-    );
+    const [items] = await pool.query("SELECT * FROM items WHERE id = ?", [
+      itemId,
+    ]);
 
     if (items.length === 0) {
       return res.status(404).json({
@@ -457,6 +517,63 @@ app.get("/api/claims/:id", authenticateToken, async (req, res) => {
 });
 
 // =========================
+// APPROVE / REJECT CLAIM (finder only)
+// =========================
+
+app.patch("/api/claims/:id", authenticateToken, async (req, res) => {
+  try {
+    const { status } = req.body;
+
+    if (!["APPROVED", "REJECTED"].includes(status)) {
+      return res.status(400).json({ error: "Invalid claim status" });
+    }
+
+    const [claims] = await pool.query(
+      `SELECT claims.student_id, claims.item_id, items.title,
+              items.student_id AS founder_id
+       FROM claims
+       JOIN items ON claims.item_id = items.id
+       WHERE claims.id = ?`,
+      [req.params.id]
+    );
+
+    if (claims.length === 0) {
+      return res.status(404).json({ error: "Claim not found" });
+    }
+
+    if (claims[0].founder_id !== req.user.id) {
+      return res
+        .status(403)
+        .json({ error: "Only the item's finder can review this claim" });
+    }
+
+    await pool.query(`UPDATE claims SET status = ? WHERE id = ?`, [
+      status,
+      req.params.id,
+    ]);
+
+    if (status === "APPROVED") {
+      await pool.query(`UPDATE items SET status = 'RETURNED' WHERE id = ?`, [
+        claims[0].item_id,
+      ]);
+    }
+
+    await pool.query(
+      `INSERT INTO notifications (user_id, message) VALUES (?, ?)`,
+      [
+        claims[0].student_id,
+        `Your claim for "${claims[0].title}" was ${status.toLowerCase()}.`,
+      ]
+    );
+
+    res.json({ message: `Claim ${status.toLowerCase()}` });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to update claim" });
+  }
+});
+
+// =========================
 // MY POSTED ITEMS
 // =========================
 
@@ -483,28 +600,24 @@ app.get("/api/my-items", authenticateToken, async (req, res) => {
 // NOTIFICATIONS
 // =========================
 
-app.get(
-  "/api/notifications",
-  authenticateToken,
-  async (req, res) => {
-    try {
-      const [rows] = await pool.query(
-        `SELECT *
-         FROM notifications
-         WHERE user_id = ?
-         ORDER BY created_at DESC`,
-        [req.user.id]
-      );
+app.get("/api/notifications", authenticateToken, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT *
+       FROM notifications
+       WHERE user_id = ?
+       ORDER BY created_at DESC`,
+      [req.user.id]
+    );
 
-      res.json(rows);
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({
-        error: "Failed to fetch notifications",
-      });
-    }
+    res.json(rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      error: "Failed to fetch notifications",
+    });
   }
-);
+});
 
 // =========================
 // PROFILE
@@ -596,40 +709,6 @@ app.get("/api/students/:studentId", async (req, res) => {
   }
 });
 
-// Team 6 claimed items/rewards
-app.get("/api/items/claimed", async (req, res) => {
-  try {
-    const { studentId } = req.query;
-
-    let sql = `
-      SELECT
-        items.id,
-        items.title,
-        items.reward_amount,
-        items.status,
-        items.student_id
-      FROM items
-      WHERE items.status = 'CLAIMED'
-    `;
-
-    const params = [];
-
-    if (studentId) {
-      sql += " AND items.student_id = ?";
-      params.push(studentId);
-    }
-
-    const [rows] = await pool.query(sql, params);
-
-    res.json(rows);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      error: "Failed to fetch claimed items",
-    });
-  }
-});
-
 // Statistics
 app.get("/api/statistics/lost-items", async (req, res) => {
   try {
@@ -653,92 +732,64 @@ app.get("/api/statistics/lost-items", async (req, res) => {
 });
 
 // =========================
+// UPSTREAM PARTNER: VENUES (Week 10 integration)
+// Your server calls the partner; the browser only calls your server.
+// =========================
+
+app.get("/api/partner-venues", async (req, res) => {
+  if (!PARTNER_URL) {
+    console.error("PARTNER_URL is not set in server/.env");
+    return res.status(502).json({ message: "Partner data unavailable" });
+  }
+
+  try {
+    const r = await fetch(`${PARTNER_URL}/api/venues`);
+
+    if (!r.ok) {
+      console.error("partner returned", r.status);
+      return res.status(502).json({ message: "Partner data unavailable" });
+    }
+
+    const venues = await r.json();
+    
+
+    // Shape check: catches renamed or missing fields instead of showing blanks
+    if (
+      !Array.isArray(venues) ||
+      (venues.length > 0 && !("venueName" in venues[0]))
+    ) {
+      console.error(
+        "partner response shape changed:",
+        Object.keys(venues[0] || {})
+      );
+      return res.status(502).json({ message: "Partner data unavailable" });
+    }
+
+    res.json(
+      venues.map((v) => ({
+        id: v.id,
+        venueName: v.venueName,
+        location: v.location,
+        capacity: v.capacity,
+        supportedGenres: v.supportedGenres,
+      }))
+    );
+  } catch (err) {
+    console.error("partner call failed:", err.cause?.code || err.message);
+    res.status(502).json({ message: "Partner data unavailable" });
+  }
+});
+
+// =========================
 // START SERVER
 // =========================
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
 
-app.patch(
-  "/api/claims/:id",
-  authenticateToken,
-  async (req, res) => {
-    try {
-      const { status } = req.body;
-
-      if (!["APPROVED", "REJECTED"].includes(status)) {
-        return res.status(400).json({ error: "Invalid claim status" });
-      }
-
-      const [claims] = await pool.query(
-        `SELECT claims.student_id, claims.item_id, items.title, items.student_id AS founder_id
-         FROM claims
-         JOIN items ON claims.item_id = items.id
-         WHERE claims.id = ?`,
-        [req.params.id]
-      );
-
-      if (claims.length === 0) {
-        return res.status(404).json({ error: "Claim not found" });
-      }
-
-      if (claims[0].founder_id !== req.user.id) {
-        return res.status(403).json({ error: "Only the item's finder can review this claim" });
-      }
-
-      await pool.query(`UPDATE claims SET status = ? WHERE id = ?`, [status, req.params.id]);
-
-      if (status === "APPROVED") {
-        await pool.query(`UPDATE items SET status = 'RETURNED' WHERE id = ?`, [claims[0].item_id]);
-      }
-
-      await pool.query(
-        `INSERT INTO notifications (user_id, message) VALUES (?, ?)`,
-        [claims[0].student_id, `Your claim for "${claims[0].title}" was ${status.toLowerCase()}.`]
-      );
-
-      res.json({ message: `Claim ${status.toLowerCase()}` });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Failed to update claim" });
-    }
-  }
-);
-
-// =========================
-// CLAIMS ON MY POSTED ITEMS
-// =========================
-
-app.get("/api/items/:id/claims", authenticateToken, async (req, res) => {
-  try {
-    const [items] = await pool.query(
-      "SELECT * FROM items WHERE id = ?",
-      [req.params.id]
-    );
-
-    if (items.length === 0) {
-      return res.status(404).json({ error: "Item not found" });
-    }
-
-    if (items[0].student_id !== req.user.id) {
-      return res.status(403).json({ error: "You did not post this item" });
-    }
-
-    const [claims] = await pool.query(
-      `SELECT claims.*, users.full_name AS claimant_name
-       FROM claims
-       JOIN users ON claims.student_id = users.id
-       WHERE claims.item_id = ?
-       ORDER BY claims.created_at DESC`,
-      [req.params.id]
-    );
-
-    res.json(claims);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Failed to fetch claims for this item" });
-  }
-});
+module.exports = app;
