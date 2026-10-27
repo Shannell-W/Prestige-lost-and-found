@@ -62,12 +62,12 @@ While preparing for Part E we also reviewed our own routes against our contract 
 - Our upstream partner's API was reachable and matched what we expected. The data changed between our first and later calls, which confirmed it is live.
 - Agreed not to restart the tunnel while our partner was testing, so the link stayed stable.
 
-## Checks to record against the address Team 4 confirmed
+## Checks against the address Team 4 confirmed (27 October)
 
 | Test | What we did | What happened |
 |---|---|---|
-| First call | `curl.exe -i https://artist-api-server.onrender.com/api/venues` | |
-| Through our server | Opened our Venues page | |
-| Saved copy | Reloaded the Venues page several times within 20 minutes; our server log shows one call to Team 4 | |
-| Partner down | Set `PARTNER_URL` to a wrong address and restarted our server (or Team 4's server was asleep) | |
-| Recovery | Restored `PARTNER_URL`; fresh data loads with no code change | |
+| First call | Opened `https://artist-api-server.onrender.com/api/venues` in the browser | 200, JSON list of 4 venues: Karatina, FUD, Kejani, Royal Arena. Fields: `id`, `userId`, `venueName`, `location`, `capacity`, `supportedGenres`, `description`, `createdAt`, `updatedAt`. No key needed |
+| Through our server | Opened our Venues page (`http://localhost:5174/venues`) | Table showed all 4 venues with Venue, Location, Capacity and Genres, matching Team 4's data exactly. Team 4's internal fields (`userId`, `description`, dates) are not shown. Screenshot: `week10-venues.png` |
+| Saved copy | Reloaded the Venues page 5 times within 20 minutes | Each reload was instant; our server called Team 4 only once and answered the rest from its saved copy |
+| Partner down | Set `PARTNER_URL` to `https://wrong-address.onrender.com` and restarted our server | Venues page showed "Partner data is unavailable right now. Please try again later." Server terminal logged: [copy the error line]. `/api/health` still worked |
+| Recovery | Restored `PARTNER_URL` and restarted our server | All 4 venues loaded again with no code change |
