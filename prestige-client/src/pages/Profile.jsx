@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { API_URL } from "../api";
 
 function Profile() {
   const [profile, setProfile] = useState(null);
@@ -12,7 +13,7 @@ function Profile() {
       return;
     }
 
-    fetch("http://localhost:5000/api/profile", {
+    fetch(`${API_URL}/api/profile`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((response) => {

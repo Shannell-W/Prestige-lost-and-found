@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { API_URL } from "../api";
 
 function Claims() {
   const user = JSON.parse(localStorage.getItem("user"));
@@ -13,7 +14,7 @@ function Claims() {
       return;
     }
 
-    fetch("http://localhost:5000/api/claims", {
+    fetch(`${API_URL}/api/claims`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((response) => {

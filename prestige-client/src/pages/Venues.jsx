@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { API_URL } from "../api";
 
 function Venues() {
   const [venues, setVenues] = useState([]);
@@ -6,7 +7,7 @@ function Venues() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/partner-venues")
+    fetch(`${API_URL}/api/partner-venues`)
       .then((response) => {
         if (!response.ok) throw new Error("Partner data unavailable");
         return response.json();

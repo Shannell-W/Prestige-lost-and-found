@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { API_URL } from "../api";
 
 function ItemDetails() {
   const { id } = useParams();
@@ -12,7 +13,7 @@ function ItemDetails() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    fetch(`http://localhost:5000/api/items/${id}`)
+    fetch(`${API_URL}/api/items/${id}`)
       .then((response) => {
         if (!response.ok) throw new Error("Item not found");
         return response.json();
@@ -41,7 +42,7 @@ function ItemDetails() {
     setSubmitting(true);
 
     try {
-      const response = await fetch("http://localhost:5000/api/claims", {
+      const response = await fetch(`${API_URL}/api/claims`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
