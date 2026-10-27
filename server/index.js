@@ -9,7 +9,8 @@ const contractRoutes = require("./routes/contract");
 
 const app = express();
 
-app.use(cors());
+// Expose the partner-data headers so the Venues page can say when it is showing a saved copy.
+app.use(cors({ exposedHeaders: ["X-Partner-Data-Age", "X-Partner-Data-Stale"] }));
 app.use(express.json());
 
 const JWT_SECRET = process.env.JWT_SECRET || "prestige-development-secret";
@@ -17,8 +18,6 @@ if (!process.env.JWT_SECRET && process.env.NODE_ENV !== "test") {
   console.warn("JWT_SECRET is not set in .env, so a default development secret is being used.");
 }
 
-// Upstream partner (set in .env, never hardcoded)
-const PARTNER_URL = process.env.PARTNER_URL;
 
 // =========================
 // AUTH MIDDLEWARE
@@ -691,61 +690,24 @@ app.get("/api/statistics/lost-items", async (req, res) => {
 });
 
 // =========================
-// UPSTREAM PARTNER: VENUES (Week 10 integration)
-// Your server calls the partner; the browser only calls your server.
+// UPSTREAM PARTNER: VENUES (Week 10 integration) — Team 4's Artist Platform API
+// See routes/partnerVenues.js. Our server calls the partner; the browser only calls our server.
 // =========================
 
-app.get("/api/partner-venues", async (req, res) => {
-  if (!PARTNER_URL) {
-    console.error("PARTNER_URL is not set in server/.env");
-    return res.status(502).json({ message: "Partner data unavailable" });
-  }
-
-  try {
-    // Give up after 20 seconds, so a sleeping or stuck partner can't hang our page.
-    const r = await fetch(`${PARTNER_URL}/api/venues`, { signal: AbortSignal.timeout(20000) });
-
-    if (!r.ok) {
-      console.error("partner returned", r.status);
-      return res.status(502).json({ message: "Partner data unavailable" });
-    }
-
-    const venues = await r.json();
-    
-
-    // Shape check: catches renamed or missing fields instead of showing blanks
-    if (
-      !Array.isArray(venues) ||
-      (venues.length > 0 && !("venueName" in venues[0]))
-    ) {
-      console.error(
-        "partner response shape changed:",
-        Object.keys(venues[0] || {})
-      );
-      return res.status(502).json({ message: "Partner data unavailable" });
-    }
-
-    res.json(
-      venues.map((v) => ({
-        id: v.id,
-        venueName: v.venueName,
-        location: v.location,
-        capacity: v.capacity,
-        supportedGenres: v.supportedGenres,
-      }))
-    );
-  } catch (err) {
-    const reason = err.name === "TimeoutError" ? "no response within 20s" : err.cause?.code || err.message;
-    console.error("partner call failed:", reason);
-    res.status(502).json({ message: "Partner data unavailable" });
-  }
-});
+app.use(require("./routes/partnerVenues"));
 
 // =========================
 // PARTNER CONTRACT API (openapi.yaml) for Team 6
 // =========================
 
 app.use(contractRoutes);
+
+// API docs (Week 8): the contract rendered with Swagger UI at http://localhost:5000/docs/
+const path = require("path");
+app.use("/docs", express.static(path.join(__dirname, "..", "docs")));
+app.get("/openapi.yaml", (req, res) => {
+  res.type("text/yaml").sendFile(path.join(__dirname, "..", "openapi.yaml"));
+});
 
 // Unknown paths: JSON, not Express's default HTML page
 app.use((req, res) => {
