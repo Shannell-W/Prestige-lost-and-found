@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { APP_CONFIG } from "../config";
-import { API_URL } from "../api";
+import { API_URL, apiFetch } from "../api";
 
 function Register() {
   const [name, setName] = useState("");
@@ -16,7 +16,7 @@ function Register() {
     setMessage("");
 
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `${API_URL}/api/auth/register`,
         {
           method: "POST",

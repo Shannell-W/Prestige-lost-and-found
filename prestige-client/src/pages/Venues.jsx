@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { API_URL } from "../api";
+import { API_URL, apiFetch } from "../api";
 
 // Venues from our upstream partner, Team 4 (Week 10).
 // Our server fetches them and remembers them for a while, so the page still works while
@@ -11,7 +11,7 @@ function Venues() {
   const [staleMinutes, setStaleMinutes] = useState(null);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/partner-venues`)
+    apiFetch(`${API_URL}/api/partner-venues`)
       .then((response) => {
         if (!response.ok) throw new Error("Partner data unavailable");
         // If Team 4 isn't answering, our server sends its last saved copy and says how old it is.

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { APP_CONFIG } from "../config";
-import { API_URL } from "../api";
+import { API_URL, apiFetch } from "../api";
 
 function ReportItems() {
   const [title, setTitle] = useState("");
@@ -27,7 +27,7 @@ function ReportItems() {
     setSubmitting(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/items`, {
+      const response = await apiFetch(`${API_URL}/api/items`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

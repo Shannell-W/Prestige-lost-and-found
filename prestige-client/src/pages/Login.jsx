@@ -1,6 +1,6 @@
 import { APP_CONFIG } from '../config';
 import { useState } from 'react';
-import { API_URL } from "../api";
+import { API_URL, apiFetch } from "../api";
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -11,7 +11,7 @@ function Login() {
     e.preventDefault();
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/login`, {
+      const response = await apiFetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ school, email, password }),

@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { API_URL } from "../api";
+import { API_URL, apiFetch } from "../api";
 
 function Items() {
   const [items, setItems] = useState([]);
@@ -8,7 +8,7 @@ function Items() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch(`${API_URL}/api/items`)
+    apiFetch(`${API_URL}/api/items`)
       .then((response) => {
         if (!response.ok) {
           throw new Error("Failed to fetch items");

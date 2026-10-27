@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { API_URL } from "../api";
+import { API_URL, apiFetch } from "../api";
 
 function Posted() {
   const user = JSON.parse(localStorage.getItem("user"));
@@ -21,7 +21,7 @@ function Posted() {
 
   async function loadItems() {
     try {
-      const response = await fetch(`${API_URL}/api/my-items`, {
+      const response = await apiFetch(`${API_URL}/api/my-items`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json();
@@ -41,7 +41,7 @@ function Posted() {
 
   async function loadClaimsForItem(itemId) {
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `${API_URL}/api/items/${itemId}/claims`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -55,7 +55,7 @@ function Posted() {
   async function handleReview(claimId, status, itemId) {
     setActionMessage("");
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `${API_URL}/api/claims/${claimId}`,
         {
           method: "PATCH",
