@@ -1,27 +1,39 @@
-const { app, request, PREFIX } = require("./helpers");
+// Contract endpoint: GET /schools/{schoolId}/item-statistics (schoolId is the school's name).
+const { app, request, pool, resetDb, keysOf, expectError } = require("../test/helpers");
+
+beforeAll(resetDb);
+afterAll(() => pool.end());
+
+const STRATHMORE = encodeURIComponent("Strathmore University");
 
 describe("GET /schools/:schoolId/item-statistics", () => {
-  it("not-found: unknown school returns 404", async () => {
-    const res = await request(app).get(`${PREFIX}/schools/DOES-NOT-EXIST/item-statistics`);
-    expect(res.status).toBe(404);
-    expect(res.body).toHaveProperty("message");
-  });
-
-  it("happy path: returns numeric aggregate counts", async () => {
-    const res = await request(app).get(
-      `${PREFIX}/schools/${encodeURIComponent(process.env.TEST_SCHOOL)}/item-statistics`
-    );
+  it("happy path: returns live totals in the contract shape", async () => {
+    const res = await request(app).get(`/schools/${STRATHMORE}/item-statistics`);
     expect(res.status).toBe(200);
-    ["totalItems", "claimedItems", "returnedItems"].forEach((f) => {
-      expect(res.body).toHaveProperty(f);
-      expect(typeof res.body[f]).toBe("number");
+    expect(keysOf(res.body)).toEqual([
+      "schoolId",
+      "schoolName",
+      "totalItemsClaimed",
+      "totalItemsReported",
+      "totalRewardAmountPaidCents",
+    ]);
+    expect(res.body).toEqual({
+      schoolId: "Strathmore University",
+      schoolName: "Strathmore University",
+      totalItemsReported: 4,
+      totalItemsClaimed: 1,
+      totalRewardAmountPaidCents: 15000,
     });
   });
 
-  it("edge: counts are never negative", async () => {
-    const res = await request(app).get(
-      `${PREFIX}/schools/${encodeURIComponent(process.env.TEST_SCHOOL)}/item-statistics`
-    );
-    expect(res.body.totalItems).toBeGreaterThanOrEqual(0);
+  it("edge: a school with nothing returned gets zeros as numbers, not an error", async () => {
+    const res = await request(app).get(`/schools/${encodeURIComponent("Kenyatta University")}/item-statistics`);
+    expect(res.status).toBe(200);
+    expect(res.body.totalItemsClaimed).toBe(0);
+    expect(res.body.totalRewardAmountPaidCents).toBe(0);
+  });
+
+  it("not found: an unknown school gives 404", async () => {
+    expectError(await request(app).get("/schools/DOES-NOT-EXIST/item-statistics"), 404, /school not found/);
   });
 });
