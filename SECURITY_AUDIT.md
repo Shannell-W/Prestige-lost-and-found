@@ -21,7 +21,7 @@ We read every response our API can return, success and error, as an attacker wou
 
 | Consumer | Key name in `API_KEYS` | How they got it |
 |---|---|---|
-| Team 6 (MoneyMentor Kenya), our downstream ring partner | `team6` | Sent by direct message to [Njeri], [27 October 2026]. Not in the class channel or the repo |
+| Team 6 (MoneyMentor Kenya), our downstream ring partner | `team6` | Sent by direct message to Njeri, 27 October 2026. Not in the class channel or the repo |
 | Our website (React app) | `prestige-web` | In `prestige-client/.env` as `VITE_API_KEY` |
 | Our team, for testing with curl/Postman | `prestige-team` | Each of us keeps it in our own `server/.env` |
 
