@@ -1,0 +1,306 @@
+openapi: 3.0.0
+info:
+  title: Prestige Lost & Found API
+  version: 1.0.0
+paths:
+  /claims:
+    get:
+      summary: Return claimed items with their reward amounts
+      parameters:
+        - name: status
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [claimed] # TODO: confirm other status values with team (pending? resolved?)
+      responses:
+        '200':
+          description: A list of claims matching the given status.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required:
+                    [claimId, studentId, itemId, status, rewardAmountCents]
+                  properties:
+                    claimId:
+                      type: string
+                    studentId:
+                      type: string
+                    itemId:
+                      type: string
+                    status:
+                      type: string
+                    rewardAmountCents:
+                      type: integer
+                      example: 1500
+    post:
+      summary: Submit a new claim on an item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [studentId, itemId]
+              properties:
+                studentId:
+                  type: string
+                itemId:
+                  type: string
+      responses:
+        '201':
+          description: Claim created.
+        '400':
+          description: Missing or invalid fields.
+
+  /claims/{claimId}:
+    patch:
+      summary: Update a claim's status
+      parameters:
+        - name: claimId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [pending, claimed, rejected]
+      responses:
+        '200':
+          description: Claim updated.
+        '400':
+          description: Missing or invalid fields.
+        '404':
+          description: No claim found with the given claimId.
+    delete:
+      summary: Withdraw/cancel a claim
+      parameters:
+        - name: claimId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Claim deleted.
+        '404':
+          description: No claim found with the given claimId.
+
+  /students/{studentId}/claims:
+    get:
+      summary: Return a student's claims with current status
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A list of claims belonging to the given student.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [claimId, itemId, status, submittedAt]
+                  properties:
+                    claimId:
+                      type: string
+                    itemId:
+                      type: string
+                    status:
+                      type: string
+                    submittedAt:
+                      type: string
+                      format: date-time
+                      example: '2026-07-01T09:15:00Z'
+        '404':
+          description: No student found with the given studentId.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+                    example: 'student not found'
+
+  /schools/{schoolId}/item-statistics:
+    get:
+      summary: Return aggregate lost-item statistics for a school
+      parameters:
+        - name: schoolId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Aggregate statistics for the given school.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  [
+                    schoolId,
+                    totalItemsReported,
+                    totalItemsClaimed,
+                    totalRewardAmountPaidCents,
+                  ]
+                properties:
+                  schoolId:
+                    type: string
+                  schoolName:
+                    type: string
+                    example: 'Lakeside High School'
+                  totalItemsReported:
+                    type: integer
+                    example: 214
+                  totalItemsClaimed:
+                    type: integer
+                    example: 132
+                  totalRewardAmountPaidCents:
+                    type: integer
+                    example: 198000
+        '404':
+          description: No school found with the given schoolId.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+                    example: 'school not found'
+
+  /claims/{claimId}/fees:
+    get:
+      summary: Return fee details for a claim
+      parameters:
+        - name: claimId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Fee details for the given claim.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [claimId, studentId, itemId, amountPayableCents]
+                properties:
+                  claimId:
+                    type: string
+                  studentId:
+                    type: string
+                  itemId:
+                    type: string
+                  amountPayableCents:
+                    type: integer
+                    example: 500
+        '404':
+          description: No claim found with the given claimId.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+                    example: 'claim not found'
+
+  /claims/{claimId}/refunds:
+    get:
+      summary: Return refund details for a claim, supporting one or more refund events
+      parameters:
+        - name: claimId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A list of refund events for the given claim (may be empty).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [refundId, claimId, studentId, amountCents, reason]
+                  properties:
+                    refundId:
+                      type: string
+                    claimId:
+                      type: string
+                    studentId:
+                      type: string
+                    amountCents:
+                      type: integer
+                      example: 250
+                    reason:
+                      type: string
+                      example: 'Item returned in damaged condition; partial refund issued.'
+                    refundedAt:
+                      type: string
+                      format: date-time
+                      example: '2026-08-20T16:30:00Z'
+        '404':
+          description: No claim found with the given claimId.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+                    example: 'claim not found'
+    post:
+      summary: Issue a refund on a claim
+      parameters:
+        - name: claimId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [studentId, amountCents, reason]
+              properties:
+                studentId:
+                  type: string
+                amountCents:
+                  type: integer
+                reason:
+                  type: string
+      responses:
+        '201':
+          description: Refund created.
+        '400':
+          description: Missing or invalid fields.
+        '404':
+          description: No claim found with the given claimId.
