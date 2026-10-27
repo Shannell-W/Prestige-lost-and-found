@@ -1,8 +1,20 @@
 // Shared test helpers.
-const request = require("supertest");
+const supertest = require("supertest");
 const app = require("../index");
 const { pool } = require("../db");
 const { seed } = require("../seed");
+
+// Every route except /api/health and the docs needs an API key (security.js), so `request(app)`
+// here sends the test key on every call. Use `rawRequest(app)` to send a request with no key.
+// The test keys are set in test/setup-env.js.
+const TEST_KEY = "test-key-prestige";
+const OTHER_KEY = "test-key-team6";
+function request(app, key = TEST_KEY) {
+  const r = supertest(app);
+  const withKey = (method) => (url) => r[method](url).set("X-API-Key", key);
+  return { get: withKey("get"), post: withKey("post"), patch: withKey("patch"), put: withKey("put"), delete: withKey("delete") };
+}
+const rawRequest = supertest;
 
 // Put the test database back to exactly the sample data from seed.js.
 // Sample data: students SU-1001 (Amani), SU-1002 (Wanjiku), SU-1003 (Brian) at Strathmore,
@@ -53,4 +65,4 @@ function expectError(res, status, messagePart) {
   if (messagePart) expect(res.body.error).toMatch(messagePart);
 }
 
-module.exports = { app, request, pool, resetDb, loginAs, ISO, keysOf, expectClaim, expectRefund, expectError };
+module.exports = { app, request, rawRequest, TEST_KEY, OTHER_KEY, pool, resetDb, loginAs, ISO, keysOf, expectClaim, expectRefund, expectError };

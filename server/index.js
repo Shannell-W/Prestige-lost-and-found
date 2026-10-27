@@ -6,12 +6,18 @@ require("dotenv").config();
 const { pool } = require("./db");
 const { HttpError, submitClaim, setClaimStatus } = require("./claimRules");
 const contractRoutes = require("./routes/contract");
+const { requireApiKey, rateLimit, logKeysLoaded } = require("./security");
+const path = require("path");
 
 const app = express();
 
-// Expose the partner-data headers so the Venues page can say when it is showing a saved copy.
-app.use(cors({ exposedHeaders: ["X-Partner-Data-Age", "X-Partner-Data-Stale"] }));
-app.use(express.json());
+// Expose the partner-data headers (so the Venues page can say when it is showing a saved copy)
+// and the rate-limit headers (so the website can tell users when to try again).
+app.use(
+  cors({
+    exposedHeaders: ["X-Partner-Data-Age", "X-Partner-Data-Stale", "Retry-After", "RateLimit-Limit", "RateLimit-Remaining"],
+  })
+);
 
 const JWT_SECRET = process.env.JWT_SECRET || "prestige-development-secret";
 if (!process.env.JWT_SECRET && process.env.NODE_ENV !== "test") {
@@ -37,19 +43,39 @@ function authenticateToken(req, res, next) {
     req.user = user;
     next();
   } catch {
-    res.status(403).json({ error: "Invalid or expired token" });
+    // 401, not 403: a bad or expired token means we don't know who you are.
+    res.status(401).json({ error: "Invalid or expired token" });
   }
 }
 
 // =========================
-// HEALTH
+// OPEN ROUTES (no API key)
+// Only these three are open; see SECURITY_AUDIT.md for why. They return no data from the database.
 // =========================
 
+// Health check, so uptime checks and partners can see the server is up without a key.
 app.get("/api/health", (req, res) => {
   res.json({
     message: "Prestige API is running",
   });
 });
+
+// API docs (Week 8): the contract rendered with Swagger UI at http://localhost:5000/docs/
+// Open so a new consumer can read how to authenticate before they have a key.
+app.use("/docs", express.static(path.join(__dirname, "..", "docs")));
+app.get("/openapi.yaml", (req, res) => {
+  res.type("text/yaml").sendFile(path.join(__dirname, "..", "openapi.yaml"));
+});
+
+// =========================
+// API KEY + RATE LIMIT (security.js)
+// Everything below this line needs a valid X-API-Key header, and each key gets 100 requests a minute.
+// Checked before the body is even read, so a caller without a key learns nothing.
+// =========================
+
+app.use(requireApiKey);
+app.use(rateLimit);
+app.use(express.json());
 
 // =========================
 // REGISTER
@@ -476,6 +502,13 @@ app.get("/api/claims/:id", authenticateToken, async (req, res) => {
       });
     }
 
+    // Only the student who made the claim, or the finder of the item, may read it.
+    // (Before the security audit, any logged-in student could read any claim by changing the ID.)
+    const [[item]] = await pool.query("SELECT student_id FROM items WHERE id = ?", [rows[0].item_id]);
+    if (rows[0].student_id !== req.user.id && item.student_id !== req.user.id) {
+      return res.status(403).json({ error: "You can only view your own claims" });
+    }
+
     res.json(rows[0]);
   } catch (error) {
     console.error(error);
@@ -702,13 +735,6 @@ app.use(require("./routes/partnerVenues"));
 
 app.use(contractRoutes);
 
-// API docs (Week 8): the contract rendered with Swagger UI at http://localhost:5000/docs/
-const path = require("path");
-app.use("/docs", express.static(path.join(__dirname, "..", "docs")));
-app.get("/openapi.yaml", (req, res) => {
-  res.type("text/yaml").sendFile(path.join(__dirname, "..", "openapi.yaml"));
-});
-
 // Unknown paths: JSON, not Express's default HTML page
 app.use((req, res) => {
   res.status(404).json({ error: `No route for ${req.method} ${req.path}` });
@@ -735,6 +761,7 @@ const PORT = process.env.PORT || 5000;
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    logKeysLoaded();
   });
 }
 

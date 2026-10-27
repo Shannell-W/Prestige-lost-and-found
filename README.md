@@ -24,7 +24,7 @@ The Prestige Lost & Found API gives claim statuses, reward amounts, fees, refund
 With the server running (see [Running it locally](#running-it-locally)), copy and paste:
 
 ```
-curl -i "http://localhost:5000/claims?status=claimed"
+curl -i -H "X-API-Key: <your-api-key>" "http://localhost:5000/claims?status=claimed"
 ```
 
 Expected `200 OK`:
@@ -37,9 +37,36 @@ On Windows PowerShell, type `curl.exe` instead of `curl`. Or paste the address i
 
 ### Authentication
 
-The partner API (every path below, with **no** `/api` prefix) **needs no key or login**. Our lecturer told us to skip API keys for now; we'll add an `X-API-Key` header later and update this section and the contract.
+**Every request needs an API key** in the `X-API-Key` header. Each consumer team has its own key; we send it to you privately (direct message). Never put your key in your code, your repo, or a group chat: keep it in your `.env`.
 
-Our own website's routes (`/api/...`) are separate. Actions like claiming an item need a login token (`Authorization: Bearer <token>` from `POST /api/auth/login`). Partners don't need those routes.
+```
+X-API-Key: <your-api-key>
+```
+
+No key, or a wrong key, gets `401` and nothing else happens:
+
+```
+HTTP/1.1 401 Unauthorized
+{"error": "Missing or invalid API key"}
+```
+
+The only open routes are `GET /api/health` (to check we're up) and the docs (`/docs/`, `/openapi.yaml`), which contain no data.
+
+### Rate limit
+
+Each key may make **100 requests per minute**. Request 101 gets `429` with a `Retry-After` header (seconds to wait) and the same number in the body:
+
+```
+HTTP/1.1 429 Too Many Requests
+Retry-After: 42
+{"error": "Too many requests", "retryAfter": 42}
+```
+
+Every response also has `RateLimit-Limit` and `RateLimit-Remaining` headers, so you can slow down before you hit the limit. If you call us from a page, save our answer for a minute rather than calling on every page load.
+
+### Our website's routes
+
+Our own website's routes (`/api/...`) are separate. They also need the website's API key, and actions like claiming an item also need a login token (`Authorization: Bearer <token>` from `POST /api/auth/login`). Partners don't need those routes.
 
 ### Conventions
 
@@ -168,8 +195,10 @@ Every error has the same shape:
 | Status | Meaning |
 |---|---|
 | 400 | A field is missing or has the wrong type, or the body isn't valid JSON |
+| 401 | The `X-API-Key` header is missing or the key isn't valid |
 | 404 | No claim, student, item or school with that ID, or no such path |
 | 409 | The request conflicts with the current state (see each endpoint) |
+| 429 | More than 100 requests with your key in a minute. Wait `Retry-After` seconds |
 | 500 | Our bug. Tell us the time and the request you sent |
 
 ---
@@ -193,6 +222,12 @@ npm install
 Copy `server/.env.example` to `server/.env` and set `DB_PASSWORD` to your MySQL password.
 (PowerShell: `copy .env.example .env`)
 
+Then set `API_KEYS`: one key per consumer, as `name:key`. Make each key with:
+
+```
+node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"
+```
+
 Create the database and tables, then load sample data:
 
 ```
@@ -208,7 +243,7 @@ Start it:
 npm start
 ```
 
-It prints `Server running on http://localhost:5000`. Check it with http://localhost:5000/api/health.
+It prints `Server running on http://localhost:5000` and `API keys loaded: 3 (team6, prestige-web, prestige-team)` (names only, never the keys). Check it with http://localhost:5000/api/health.
 
 ### 2. The website
 
@@ -229,7 +264,7 @@ Open the address it prints (usually http://localhost:5173). Sample logins, all w
 | brian@strathmore.test | Strathmore University |
 | faith@ku.test | Kenyatta University |
 
-To point the website at a different server (e.g. a deployed one), set `VITE_API_URL` in `prestige-client/.env` (see `prestige-client/.env.example`).
+The website needs its own key: copy `prestige-client/.env.example` to `prestige-client/.env` and set `VITE_API_KEY` to the `prestige-web` key from `server/.env`. Restart `npm run dev` after changing it. To point the website at a different server (e.g. a deployed one), set `VITE_API_URL` in the same file.
 
 ### 3. Tests
 
@@ -238,7 +273,7 @@ cd server
 npm test
 ```
 
-The tests build their own database, `prestige_db_test`, so they never touch your real data. They cover every partner endpoint (success, validation errors, not-found, edge cases), the website's claim rules, and the Team 4 venues integration (using a stand-in Team 4 server).
+The tests build their own database, `prestige_db_test`, so they never touch your real data. They cover every partner endpoint (success, validation errors, not-found, edge cases), the website's claim rules, API keys and the rate limit (`__tests__/security.test.js`), and the Team 4 venues integration (using a stand-in Team 4 server). See [`SECURITY_AUDIT.md`](./SECURITY_AUDIT.md) for the security review.
 
 ---
 

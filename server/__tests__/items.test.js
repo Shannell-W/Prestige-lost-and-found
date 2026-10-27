@@ -1,6 +1,4 @@
-const request = require("supertest");
-const app = require("../index");
-const { pool, resetDb } = require("../test/helpers");
+const { app, request, pool, resetDb } = require("../test/helpers");
 
 // Start from the sample data in seed.js, and close the database connection at the end.
 beforeAll(resetDb);

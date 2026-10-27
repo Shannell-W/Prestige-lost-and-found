@@ -1,7 +1,7 @@
 # Contract Deviations
 
 Changes to `openapi.yaml` since the version we handed Team 6 in Week 4 (1.0.0), and why.
-The current contract is **2.0.0**. Every path and every field name from 1.0.0 still exists, so code written against 1.0.0 keeps working; the points marked **Behaviour change** are the ones Team 6 should check.
+The current contract is **2.1.0**. Every path and every field name from 1.0.0 still exists, so code written against 1.0.0 keeps working; the points marked **Behaviour change** are the ones Team 6 should check.
 
 ## Correction (27 October)
 
@@ -23,6 +23,15 @@ Schools have no separate ID in our database; `users.school` and `items.school` s
 Our database had no fees or refunds, so these endpoints couldn't return real data. We added two tables (`fees`, `refunds` in `server/schema.sql`):
 - A **handling fee** is recorded when a claim is approved. The amount is `CLAIM_FEE_CENTS` in `server/.env`, currently **10000 (KSh 100.00)**. **Team decision:** confirm this amount.
 - **Refunds** are partial or full refunds of that fee; their total can never exceed it.
+
+## Changes in 2.1.0 (API security)
+
+| # | Endpoint | What changed | Why |
+|---|---|---|---|
+| 11 | **All** | **Behaviour change:** every request needs an `X-API-Key` header with your team's key; missing or wrong key gets `401 {"error": "Missing or invalid API key"}` | Before this, anyone with our address could read every claim and refund. Each consumer gets its own key so we can tell callers apart and revoke one without breaking others |
+| 12 | **All** | **Behaviour change:** 100 requests per minute per key; request 101 gets `429` with a `Retry-After` header and `{"error": "Too many requests", "retryAfter": <seconds>}` | Stops one caller (or a buggy loop) from overloading the API for everyone |
+
+Team 6: ask us for your key (we send it by direct message), put it in your `.env`, and send it as `X-API-Key` on every call. Nothing else about the requests or responses changed.
 
 ## Changes in 2.0.0
 

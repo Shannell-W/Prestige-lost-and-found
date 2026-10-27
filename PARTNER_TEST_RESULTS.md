@@ -19,9 +19,10 @@ The tests build their own database (`prestige_db_test`) from `server/schema.sql`
 | `__tests__/items.test.js` | Our website's item routes (`/api/items`) | 6 |
 | `__tests__/website-claims.test.js` | Our website's claim rules (`/api/claims`) and JSON 404s | 12 |
 | `__tests__/partner-venues.test.js` | Venues from Team 4: both of their server shapes, key header when set, 20-minute saved copy, 429/401/down/slow/renamed-field handling | 10 |
-| **Total** | | **71** |
+| `__tests__/security.test.js` | API keys (401 with no or wrong key, 200 with a valid one), rate limit (429 with Retry-After), and the security audit fixes | 17 |
+| **Total** | | **88** |
 
-Result on [date], on [whose laptop], against MySQL: [71 passed, 0 failed]
+Result on [date], on [whose laptop], against MySQL: [88 passed, 0 failed]
 
 ### Every contract endpoint is covered four ways
 

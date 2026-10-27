@@ -5,9 +5,7 @@
 // - otherwise: like their contracted API (EMT-MOSES/Team-4--Artist-platform): needs x-api-key,
 //   venues have id, name, capacity, and it allows 3 successful requests per hour, then answers 429.
 const http = require("http");
-const request = require("supertest");
-const app = require("../index");
-const { pool } = require("../db");
+const { app, request, pool } = require("../test/helpers");
 const partnerVenues = require("../routes/partnerVenues");
 
 const KEY = "team-4-test-key";
