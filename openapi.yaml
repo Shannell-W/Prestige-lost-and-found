@@ -1,43 +1,196 @@
 openapi: 3.0.0
 info:
   title: Prestige Lost & Found API
-  version: 1.0.0
+  version: 2.1.0
+  description: >
+    Claims, fees, refunds and school statistics from Campus Lost & Found (Team 5),
+    for Team 6 (MoneyMentor Kenya). These routes have no /api prefix.
+    Every request needs your API key in the X-API-Key header (ask Team 5 for yours);
+    without a valid key you get 401. Each key may make 100 requests per minute;
+    after that you get 429 with a Retry-After header.
+    Money amounts are whole cents (10000 = KSh 100.00). Timestamps are ISO 8601 in UTC.
+    studentId is the student's own school ID (e.g. "SU-1001"); claimId and itemId are
+    numbers sent as strings. Every error response has the shape {"error": "<message>"}.
+    Changes since 1.0.0 are listed in CONTRACT_DEVIATIONS.md.
+
+servers:
+  - url: http://localhost:5000
+    description: Local development server
+
+security:
+  - ApiKeyAuth: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Your team's own key, sent privately by Team 5. Never put it in your code or repo.
+
+  parameters:
+    ClaimId:
+      name: claimId
+      in: path
+      required: true
+      description: The claim's ID, e.g. "1". Anything that isn't a whole number gets 404.
+      schema:
+        type: string
+        example: '1'
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: claim not found
+
+    ClaimStatus:
+      type: string
+      enum: [pending, claimed, rejected]
+      description: >
+        pending = waiting for the finder to decide; claimed = approved, the item was
+        returned to this student; rejected = not approved.
+      example: claimed
+
+    Claim:
+      type: object
+      required: [claimId, studentId, itemId, status, rewardAmountCents]
+      properties:
+        claimId:
+          type: string
+          example: '1'
+        studentId:
+          type: string
+          description: The claimant's school student ID.
+          example: SU-1001
+        itemId:
+          type: string
+          example: '1'
+        status:
+          $ref: '#/components/schemas/ClaimStatus'
+        rewardAmountCents:
+          type: integer
+          description: The reward the finder set on the item, in cents.
+          example: 15000
+
+    Refund:
+      type: object
+      required: [refundId, claimId, studentId, amountCents, reason, refundedAt]
+      properties:
+        refundId:
+          type: string
+          example: '1'
+        claimId:
+          type: string
+          example: '1'
+        studentId:
+          type: string
+          example: SU-1001
+        amountCents:
+          type: integer
+          minimum: 1
+          example: 2500
+        reason:
+          type: string
+          example: Item returned with a broken zip; partial refund issued.
+        refundedAt:
+          type: string
+          format: date-time
+          example: '2026-10-08T13:30:00Z'
+
+  responses:
+    Unauthorized:
+      description: The X-API-Key header is missing, or the key isn't valid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Missing or invalid API key
+    TooManyRequests:
+      description: More than 100 requests with this key in the last minute. Wait Retry-After seconds, then try again.
+      headers:
+        Retry-After:
+          description: Seconds until you can make requests again.
+          schema:
+            type: integer
+            example: 42
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error, retryAfter]
+            properties:
+              error:
+                type: string
+                example: Too many requests
+              retryAfter:
+                type: integer
+                description: Same as the Retry-After header, in seconds.
+                example: 42
+    BadRequest:
+      description: A required field is missing, has the wrong type, or the body isn't valid JSON.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: studentId is required and must be a string
+    ClaimNotFound:
+      description: No claim with that claimId.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: claim not found
+
 paths:
   /claims:
     get:
-      summary: Return claimed items with their reward amounts
+      summary: List claims with a given status, with each item's reward amount
       parameters:
         - name: status
           in: query
           required: true
           schema:
-            type: string
-            enum: [claimed] # TODO: confirm other status values with team (pending? resolved?)
+            $ref: '#/components/schemas/ClaimStatus'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '200':
-          description: A list of claims matching the given status.
+          description: Claims with that status, oldest first. An empty list if there are none.
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  type: object
-                  required:
-                    [claimId, studentId, itemId, status, rewardAmountCents]
-                  properties:
-                    claimId:
-                      type: string
-                    studentId:
-                      type: string
-                    itemId:
-                      type: string
-                    status:
-                      type: string
-                    rewardAmountCents:
-                      type: integer
-                      example: 1500
+                  $ref: '#/components/schemas/Claim'
+              example:
+                - claimId: '1'
+                  studentId: SU-1001
+                  itemId: '1'
+                  status: claimed
+                  rewardAmountCents: 15000
+        '400':
+          description: status is missing or not one of pending, claimed, rejected.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: 'status must be one of: pending, claimed, rejected'
     post:
-      summary: Submit a new claim on an item
+      summary: Submit a claim on a found item for a student
+      description: >
+        The new claim is pending, and the item is marked as claimed (waiting for review).
+        A student can't claim an item they found themselves, an item that was already
+        returned, or the same item twice.
       requestBody:
         required: true
         content:
@@ -48,23 +201,60 @@ paths:
               properties:
                 studentId:
                   type: string
+                  example: SU-1001
                 itemId:
                   type: string
+                  example: '3'
+                evidence:
+                  type: string
+                  description: Optional. Why the student believes the item is theirs.
+                  example: My name is printed on the card.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '201':
           description: Claim created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Claim'
+              example:
+                claimId: '4'
+                studentId: SU-1001
+                itemId: '3'
+                status: pending
+                rewardAmountCents: 0
         '400':
-          description: Missing or invalid fields.
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: No student or no item with that ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: student not found
+        '409':
+          description: The student found this item, the item was already returned, or they already claimed it.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: You have already claimed this item
 
   /claims/{claimId}:
+    parameters:
+      - $ref: '#/components/parameters/ClaimId'
     patch:
-      summary: Update a claim's status
-      parameters:
-        - name: claimId
-          in: path
-          required: true
-          schema:
-            type: string
+      summary: Set a claim's status
+      description: >
+        Sending the status a claim already has changes nothing. Setting "claimed" makes this
+        student the owner: other pending claims on the item become "rejected", the item is
+        marked returned, and a handling fee is recorded (see /claims/{claimId}/fees). Only one
+        claim per item can be "claimed".
       requestBody:
         required: true
         content:
@@ -74,41 +264,65 @@ paths:
               required: [status]
               properties:
                 status:
-                  type: string
-                  enum: [pending, claimed, rejected]
+                  $ref: '#/components/schemas/ClaimStatus'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '200':
-          description: Claim updated.
+          description: The updated claim.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Claim'
         '400':
-          description: Missing or invalid fields.
+          description: status is missing or invalid (checked before the claim is looked up).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
-          description: No claim found with the given claimId.
+          $ref: '#/components/responses/ClaimNotFound'
+        '409':
+          description: Another claim on this item is already approved, or this claim has refunds so its approval can't be undone.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Another claim on this item has already been approved
     delete:
-      summary: Withdraw/cancel a claim
-      parameters:
-        - name: claimId
-          in: path
-          required: true
-          schema:
-            type: string
+      summary: Withdraw a claim
+      description: Deletes the claim with its fee and refunds. If it was the approved claim, the item becomes available again.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '204':
-          description: Claim deleted.
+          description: Claim deleted. No body.
         '404':
-          description: No claim found with the given claimId.
+          $ref: '#/components/responses/ClaimNotFound'
 
   /students/{studentId}/claims:
     get:
-      summary: Return a student's claims with current status
+      summary: List a student's claims with their current status
       parameters:
         - name: studentId
           in: path
           required: true
+          description: The student's school student ID.
           schema:
             type: string
+            example: SU-1001
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '200':
-          description: A list of claims belonging to the given student.
+          description: The student's claims, oldest first. An empty list if they have made none.
           content:
             application/json:
               schema:
@@ -119,88 +333,88 @@ paths:
                   properties:
                     claimId:
                       type: string
+                      example: '1'
                     itemId:
                       type: string
+                      example: '1'
                     status:
-                      type: string
+                      $ref: '#/components/schemas/ClaimStatus'
                     submittedAt:
                       type: string
                       format: date-time
-                      example: '2026-07-01T09:15:00Z'
+                      example: '2026-10-01T06:15:00Z'
         '404':
-          description: No student found with the given studentId.
+          description: No student with that studentId.
           content:
             application/json:
               schema:
-                type: object
-                required: [error]
-                properties:
-                  error:
-                    type: string
-                    example: 'student not found'
+                $ref: '#/components/schemas/Error'
+              example:
+                error: student not found
 
   /schools/{schoolId}/item-statistics:
     get:
-      summary: Return aggregate lost-item statistics for a school
+      summary: Lost-item statistics for a school
       parameters:
         - name: schoolId
           in: path
           required: true
+          description: The school's name, URL-encoded, e.g. Strathmore%20University.
           schema:
             type: string
+            example: Strathmore University
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '200':
-          description: Aggregate statistics for the given school.
+          description: Totals calculated live from the school's items.
           content:
             application/json:
               schema:
                 type: object
-                required:
-                  [
-                    schoolId,
-                    totalItemsReported,
-                    totalItemsClaimed,
-                    totalRewardAmountPaidCents,
-                  ]
+                required: [schoolId, schoolName, totalItemsReported, totalItemsClaimed, totalRewardAmountPaidCents]
                 properties:
                   schoolId:
                     type: string
+                    example: Strathmore University
                   schoolName:
                     type: string
-                    example: 'Lakeside High School'
+                    example: Strathmore University
                   totalItemsReported:
                     type: integer
-                    example: 214
+                    description: Every item reported found at this school.
+                    example: 4
                   totalItemsClaimed:
                     type: integer
-                    example: 132
+                    description: Items returned to their owner (an approved claim).
+                    example: 1
                   totalRewardAmountPaidCents:
                     type: integer
-                    example: 198000
+                    description: Total rewards on returned items, in cents.
+                    example: 15000
         '404':
-          description: No school found with the given schoolId.
+          description: No student or item belongs to a school with that name.
           content:
             application/json:
               schema:
-                type: object
-                required: [error]
-                properties:
-                  error:
-                    type: string
-                    example: 'school not found'
+                $ref: '#/components/schemas/Error'
+              example:
+                error: school not found
 
   /claims/{claimId}/fees:
     get:
-      summary: Return fee details for a claim
+      summary: The handling fee payable on an approved claim
       parameters:
-        - name: claimId
-          in: path
-          required: true
-          schema:
-            type: string
+        - $ref: '#/components/parameters/ClaimId'
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '200':
-          description: Fee details for the given claim.
+          description: Fee details for the claim.
           content:
             application/json:
               schema:
@@ -209,80 +423,50 @@ paths:
                 properties:
                   claimId:
                     type: string
+                    example: '1'
                   studentId:
                     type: string
+                    example: SU-1001
                   itemId:
                     type: string
+                    example: '1'
                   amountPayableCents:
                     type: integer
-                    example: 500
+                    example: 10000
         '404':
-          description: No claim found with the given claimId.
+          description: >
+            No claim with that claimId ("claim not found"), or the claim exists but hasn't
+            been approved, so no fee has been charged yet ("no fee has been charged on this claim yet").
           content:
             application/json:
               schema:
-                type: object
-                required: [error]
-                properties:
-                  error:
-                    type: string
-                    example: 'claim not found'
+                $ref: '#/components/schemas/Error'
+              example:
+                error: no fee has been charged on this claim yet
 
   /claims/{claimId}/refunds:
+    parameters:
+      - $ref: '#/components/parameters/ClaimId'
     get:
-      summary: Return refund details for a claim, supporting one or more refund events
-      parameters:
-        - name: claimId
-          in: path
-          required: true
-          schema:
-            type: string
+      summary: List refunds on a claim (a claim can have several partial refunds)
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '200':
-          description: A list of refund events for the given claim (may be empty).
+          description: Refunds on the claim, oldest first. An empty list if there are none.
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  type: object
-                  required: [refundId, claimId, studentId, amountCents, reason]
-                  properties:
-                    refundId:
-                      type: string
-                    claimId:
-                      type: string
-                    studentId:
-                      type: string
-                    amountCents:
-                      type: integer
-                      example: 250
-                    reason:
-                      type: string
-                      example: 'Item returned in damaged condition; partial refund issued.'
-                    refundedAt:
-                      type: string
-                      format: date-time
-                      example: '2026-08-20T16:30:00Z'
+                  $ref: '#/components/schemas/Refund'
         '404':
-          description: No claim found with the given claimId.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [error]
-                properties:
-                  error:
-                    type: string
-                    example: 'claim not found'
+          $ref: '#/components/responses/ClaimNotFound'
     post:
-      summary: Issue a refund on a claim
-      parameters:
-        - name: claimId
-          in: path
-          required: true
-          schema:
-            type: string
+      summary: Refund part or all of a claim's handling fee
+      description: The total refunded on a claim can never be more than its fee.
       requestBody:
         required: true
         content:
@@ -293,14 +477,35 @@ paths:
               properties:
                 studentId:
                   type: string
+                  description: Must be the student who made the claim.
+                  example: SU-1001
                 amountCents:
                   type: integer
+                  minimum: 1
+                  example: 1000
                 reason:
                   type: string
+                  example: Collected late because the office was closed.
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '201':
           description: Refund created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Refund'
         '400':
-          description: Missing or invalid fields.
+          $ref: '#/components/responses/BadRequest'
         '404':
-          description: No claim found with the given claimId.
+          $ref: '#/components/responses/ClaimNotFound'
+        '409':
+          description: The claim has no fee, or the refund is more than what is left of the fee.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: refund exceeds the remaining refundable fee of 7500 cents

@@ -3,16 +3,16 @@
 ## 1. Team Information
 
 ### Team Name
-[Team 5]
+Team 5 (Prestige)
 
 ### Team Members and Starting Roles
 
 | Member | Starting Role |
 |---|---|
-| [Shannell Wanjiru] | [API Lead] |
-| [Tony Kibe] | [Backend Dev] |
-| [Raika Kanyiha] | [Inteegration/QA Lead] |
-| [Tresor Maguta ] | [Docs/DevOps Lead] |
+| Shannell Wanjiru | API Lead |
+| Tony Kibe | Backend Dev |
+| Raika Kanyiha | Integration/QA Lead |
+| GuyTresor Gacheru | Docs/DevOps Lead |
 
 ---
 
@@ -64,16 +64,17 @@ The Campus Lost and Found website is a student-focused platform designed to help
 
 ### We Consume From
 
-[Team 4]
+Team 4 (Music & Event Discovery Platform: the Artist API)
 
 ### Teams/Systems That Consume From Us
 
-[Team 6]
+Team 6 (MoneyMentor Kenya)
 
 ### Ring Summary
 
+Team 4 → **Team 5 (us)** → Team 6. We read venue and artist data from Team 4's Artist API; Team 6 reads our claim, reward, fee and school statistics data.
 
 
 ## Repository
 
-[Campus Lost and Found GitHub Repository](https://github.com/guytresorgacheru-ops/prestige-webapp)
+[Campus Lost and Found GitHub Repository](https://github.com/Shannell-W/Prestige-lost-and-found)

@@ -1,5 +1,5 @@
 import { Routes, Route } from 'react-router-dom';
-import Home from './pages/home';
+import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Items from './pages/Items';
@@ -11,9 +11,12 @@ import ReportItems from './pages/ReportItems';
 import Posted from './pages/Posted';
 import Profile from './pages/Profile';
 import Venues from './pages/Venues';
+import ThemeToggle from './components/ThemeToggle';
 
 function App() {
   return (
+    <>
+    <ThemeToggle />
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
@@ -28,6 +31,7 @@ function App() {
       <Route path="/profile" element={<Profile />} />
       <Route path="/venues" element={<Venues />} />
     </Routes>
+    </>
   );
 }
 

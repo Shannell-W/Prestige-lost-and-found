@@ -1,5 +1,11 @@
+<<<<<<< HEAD
    node_modules
    .env
    dist
    desktop.ini
    
+=======
+node_modules
+.env
+dist
+>>>>>>> a9861a0382972ba2da22159eeafb61be05e65a63
