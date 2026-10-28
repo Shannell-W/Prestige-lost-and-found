@@ -15,16 +15,35 @@ This repository has three parts:
 
 ---
 
-## The partner API (for Team 6)
+## The partner API (for partner teams: Team 6, Team 7)
 
 The Prestige Lost & Found API gives claim statuses, reward amounts, fees, refunds and school statistics. The full contract is [`openapi.yaml`](./openapi.yaml), and with the server running you can browse it at **http://localhost:5000/docs/**.
 
-### Quickstart
+### Base URL
 
-With the server running (see [Running it locally](#running-it-locally)), copy and paste:
+| Who | Base URL |
+|---|---|
+| Partner teams (from anywhere) | **`https://kenneth-resist-boxed-occurrence.trycloudflare.com`** (live from 28 October 2026) |
+| Our own team, on our own laptop | `http://localhost:5000` |
+
+Add the endpoint path straight after the base URL, with **no `/api`**. For example, `GET /claims`:
 
 ```
-curl -i -H "X-API-Key: <your-api-key>" "http://localhost:5000/claims?status=claimed"
+https://kenneth-resist-boxed-occurrence.trycloudflare.com/claims?status=claimed
+```
+
+The public base URL is a Cloudflare tunnel to our server, which runs on our laptop. Please note:
+- It only works while our laptop, server and tunnel are running. Agree a testing time with us.
+- **The link changes whenever we restart the tunnel.** We'll message you the new one, and update this table.
+- Check it's up first (no key needed): `<base URL>/api/health` should return `{"message":"Prestige API is running"}`.
+- `localhost` addresses only work on our own laptop. Don't use them from your app.
+
+### Quickstart
+
+Copy and paste, with your own key:
+
+```
+curl -i -H "X-API-Key: <your-api-key>" "https://kenneth-resist-boxed-occurrence.trycloudflare.com/claims?status=claimed"
 ```
 
 Expected `200 OK`:
@@ -33,7 +52,9 @@ Expected `200 OK`:
 [{"claimId":"1","studentId":"SU-1001","itemId":"1","status":"claimed","rewardAmountCents":15000}]
 ```
 
-On Windows PowerShell, type `curl.exe` instead of `curl`. Or paste the address into a browser.
+On Windows PowerShell, type `curl.exe` instead of `curl`. Pasting the address into a browser won't work, because a browser can't send the `X-API-Key` header: use curl, Postman, or your code.
+
+`GET /claims` needs `status` (`pending`, `claimed` or `rejected`); without it you get `400`.
 
 ### Authentication
 
