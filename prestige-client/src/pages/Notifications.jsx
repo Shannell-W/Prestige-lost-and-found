@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { API_URL, apiFetch } from "../api";
 
 function Notifications() {
   const user = JSON.parse(localStorage.getItem("user"));
@@ -14,7 +15,7 @@ function Notifications() {
       return;
     }
 
-    fetch("http://localhost:5000/api/notifications", {
+    apiFetch(`${API_URL}/api/notifications`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },

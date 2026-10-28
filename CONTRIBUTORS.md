@@ -2,5 +2,5 @@
 
 - Tony Kibe
 - Raika Kanyiha
-- Tresor Maguta
+- GuyTresor Gacheru
 - Shannell Wanjiru

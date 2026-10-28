@@ -1,27 +1,29 @@
 const express = require("express");
 const cors = require("cors");
-const mysql = require("mysql2/promise");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
+const { pool } = require("./db");
+const { HttpError, submitClaim, setClaimStatus } = require("./claimRules");
+const contractRoutes = require("./routes/contract");
+const { requireApiKey, rateLimit, logKeysLoaded } = require("./security");
+const path = require("path");
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
-
-const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT,
-});
+// Expose the partner-data headers (so the Venues page can say when it is showing a saved copy)
+// and the rate-limit headers (so the website can tell users when to try again).
+app.use(
+  cors({
+    exposedHeaders: ["X-Partner-Data-Age", "X-Partner-Data-Stale", "Retry-After", "RateLimit-Limit", "RateLimit-Remaining"],
+  })
+);
 
 const JWT_SECRET = process.env.JWT_SECRET || "prestige-development-secret";
+if (!process.env.JWT_SECRET && process.env.NODE_ENV !== "test") {
+  console.warn("JWT_SECRET is not set in .env, so a default development secret is being used.");
+}
 
-// Upstream partner (set in .env, never hardcoded)
-const PARTNER_URL = process.env.PARTNER_URL;
 
 // =========================
 // AUTH MIDDLEWARE
@@ -41,19 +43,39 @@ function authenticateToken(req, res, next) {
     req.user = user;
     next();
   } catch {
-    res.status(403).json({ error: "Invalid or expired token" });
+    // 401, not 403: a bad or expired token means we don't know who you are.
+    res.status(401).json({ error: "Invalid or expired token" });
   }
 }
 
 // =========================
-// HEALTH
+// OPEN ROUTES (no API key)
+// Only these three are open; see SECURITY_AUDIT.md for why. They return no data from the database.
 // =========================
 
+// Health check, so uptime checks and partners can see the server is up without a key.
 app.get("/api/health", (req, res) => {
   res.json({
     message: "Prestige API is running",
   });
 });
+
+// API docs (Week 8): the contract rendered with Swagger UI at http://localhost:5000/docs/
+// Open so a new consumer can read how to authenticate before they have a key.
+app.use("/docs", express.static(path.join(__dirname, "..", "docs")));
+app.get("/openapi.yaml", (req, res) => {
+  res.type("text/yaml").sendFile(path.join(__dirname, "..", "openapi.yaml"));
+});
+
+// =========================
+// API KEY + RATE LIMIT (security.js)
+// Everything below this line needs a valid X-API-Key header, and each key gets 100 requests a minute.
+// Checked before the body is even read, so a caller without a key learns nothing.
+// =========================
+
+app.use(requireApiKey);
+app.use(rateLimit);
+app.use(express.json());
 
 // =========================
 // REGISTER
@@ -393,49 +415,22 @@ app.post("/api/claims", authenticateToken, async (req, res) => {
       });
     }
 
-    const [items] = await pool.query("SELECT * FROM items WHERE id = ?", [
-      itemId,
-    ]);
-
-    if (items.length === 0) {
-      return res.status(404).json({
-        error: "Item not found",
-      });
-    }
-
-    const [existing] = await pool.query(
-      `SELECT id FROM claims
-       WHERE item_id = ? AND student_id = ?`,
-      [itemId, req.user.id]
-    );
-
-    if (existing.length > 0) {
-      return res.status(409).json({
-        error: "You have already claimed this item",
-      });
-    }
-
-    const [result] = await pool.query(
-      `INSERT INTO claims
-      (item_id, student_id, evidence)
-      VALUES (?, ?, ?)`,
-      [itemId, req.user.id, evidence]
-    );
-
-    await pool.query(
-      `INSERT INTO notifications (user_id, message)
-       VALUES (?, ?)`,
-      [
-        items[0].student_id,
-        `Someone submitted a claim for your item "${items[0].title}".`,
-      ]
-    );
+    // Shared rules (claimRules.js): blocks claiming your own item or a returned one,
+    // blocks duplicate claims, sets the item to CLAIMED, and notifies the finder.
+    const claimId = await submitClaim({
+      itemId: Number(itemId),
+      userId: req.user.id,
+      evidence,
+    });
 
     res.status(201).json({
       message: "Claim submitted successfully",
-      claimId: result.insertId,
+      claimId,
     });
   } catch (error) {
+    if (error instanceof HttpError) {
+      return res.status(error.status).json({ error: error.status === 404 ? "Item not found" : error.message });
+    }
     console.error(error);
     res.status(500).json({
       error: "Failed to submit claim",
@@ -507,6 +502,13 @@ app.get("/api/claims/:id", authenticateToken, async (req, res) => {
       });
     }
 
+    // Only the student who made the claim, or the finder of the item, may read it.
+    // (Before the security audit, any logged-in student could read any claim by changing the ID.)
+    const [[item]] = await pool.query("SELECT student_id FROM items WHERE id = ?", [rows[0].item_id]);
+    if (rows[0].student_id !== req.user.id && item.student_id !== req.user.id) {
+      return res.status(403).json({ error: "You can only view your own claims" });
+    }
+
     res.json(rows[0]);
   } catch (error) {
     console.error(error);
@@ -547,27 +549,15 @@ app.patch("/api/claims/:id", authenticateToken, async (req, res) => {
         .json({ error: "Only the item's finder can review this claim" });
     }
 
-    await pool.query(`UPDATE claims SET status = ? WHERE id = ?`, [
-      status,
-      req.params.id,
-    ]);
-
-    if (status === "APPROVED") {
-      await pool.query(`UPDATE items SET status = 'RETURNED' WHERE id = ?`, [
-        claims[0].item_id,
-      ]);
-    }
-
-    await pool.query(
-      `INSERT INTO notifications (user_id, message) VALUES (?, ?)`,
-      [
-        claims[0].student_id,
-        `Your claim for "${claims[0].title}" was ${status.toLowerCase()}.`,
-      ]
-    );
+    // Shared rules (claimRules.js): approving rejects the other pending claims,
+    // marks the item RETURNED, records the fee and notifies everyone involved.
+    await setClaimStatus(Number(req.params.id), status);
 
     res.json({ message: `Claim ${status.toLowerCase()}` });
   } catch (error) {
+    if (error instanceof HttpError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     console.error(error);
     res.status(500).json({ error: "Failed to update claim" });
   }
@@ -662,8 +652,9 @@ app.get("/api/students", async (req, res) => {
   try {
     const { schoolId } = req.query;
 
+    // No email addresses: this route is public, so it must not expose personal contact details.
     let sql = `
-      SELECT id, full_name, student_id, school, email
+      SELECT id, full_name, student_id, school
       FROM users
     `;
 
@@ -688,7 +679,7 @@ app.get("/api/students", async (req, res) => {
 app.get("/api/students/:studentId", async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT id, full_name, student_id, school, email
+      `SELECT id, full_name, student_id, school
        FROM users
        WHERE student_id = ?`,
       [req.params.studentId]
@@ -732,52 +723,33 @@ app.get("/api/statistics/lost-items", async (req, res) => {
 });
 
 // =========================
-// UPSTREAM PARTNER: VENUES (Week 10 integration)
-// Your server calls the partner; the browser only calls your server.
+// UPSTREAM PARTNER: VENUES (Week 10 integration) — Team 4's Artist Platform API
+// See routes/partnerVenues.js. Our server calls the partner; the browser only calls our server.
 // =========================
 
-app.get("/api/partner-venues", async (req, res) => {
-  if (!PARTNER_URL) {
-    console.error("PARTNER_URL is not set in server/.env");
-    return res.status(502).json({ message: "Partner data unavailable" });
+app.use(require("./routes/partnerVenues"));
+
+// =========================
+// PARTNER CONTRACT API (openapi.yaml) for Team 6
+// =========================
+
+app.use(contractRoutes);
+
+// Unknown paths: JSON, not Express's default HTML page
+app.use((req, res) => {
+  res.status(404).json({ error: `No route for ${req.method} ${req.path}` });
+});
+
+// Errors: bad JSON gets 400; anything unexpected gets 500 with details kept in the server log
+app.use((err, req, res, next) => {
+  if (err.type === "entity.parse.failed") {
+    return res.status(400).json({ error: "Request body is not valid JSON" });
   }
-
-  try {
-    const r = await fetch(`${PARTNER_URL}/api/venues`);
-
-    if (!r.ok) {
-      console.error("partner returned", r.status);
-      return res.status(502).json({ message: "Partner data unavailable" });
-    }
-
-    const venues = await r.json();
-    
-
-    // Shape check: catches renamed or missing fields instead of showing blanks
-    if (
-      !Array.isArray(venues) ||
-      (venues.length > 0 && !("venueName" in venues[0]))
-    ) {
-      console.error(
-        "partner response shape changed:",
-        Object.keys(venues[0] || {})
-      );
-      return res.status(502).json({ message: "Partner data unavailable" });
-    }
-
-    res.json(
-      venues.map((v) => ({
-        id: v.id,
-        venueName: v.venueName,
-        location: v.location,
-        capacity: v.capacity,
-        supportedGenres: v.supportedGenres,
-      }))
-    );
-  } catch (err) {
-    console.error("partner call failed:", err.cause?.code || err.message);
-    res.status(502).json({ message: "Partner data unavailable" });
+  if (err instanceof HttpError) {
+    return res.status(err.status).json({ error: err.message });
   }
+  console.error(err);
+  res.status(500).json({ error: "Internal server error" });
 });
 
 // =========================
@@ -789,6 +761,7 @@ const PORT = process.env.PORT || 5000;
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    logKeysLoaded();
   });
 }
 

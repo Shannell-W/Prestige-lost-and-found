@@ -1,64 +1,55 @@
 # Contract Deviations
 
-## Week 5 — Read Endpoints (GETs)
+Changes to `openapi.yaml` since the version we handed Team 6 in Week 4 (1.0.0), and why.
+The current contract is **2.1.0**. Every path and every field name from 1.0.0 still exists, so code written against 1.0.0 keeps working; the points marked **Behaviour change** are the ones Team 6 should check.
 
-### 1. Route prefix mismatch
-`openapi.yaml` defines paths with no prefix (e.g. `/claims`), but the rest of
-this codebase uses an `/api` prefix for every other route (e.g. `/api/items`).
-The five new contract endpoints built this week were implemented at their
-exact literal paths from the contract (no `/api` prefix), to avoid colliding
-with existing same-named routes that serve a different purpose
-(`/api/claims` already exists and returns the logged-in student's own claims).
+## Correction (27 October)
 
-**Update:** Week 6's write endpoints (`POST /claims`, `PATCH /claims/{claimId}`,
-etc.) were also built with no `/api` prefix, matching the contract exactly.
-This confirms the team is converging on matching the contract's literal paths
-rather than keeping the older `/api` prefix — no further discussion needed.
+An earlier version of this file said the Week 5 GET endpoints and Week 6 write endpoints were implemented. They weren't in the repository: `server/index.js` only had our website's `/api/...` routes, so none of the contract paths answered. They have now been built in `server/routes/contract.js` and are covered by automated tests (`server/__tests__/`). The decisions below are the ones the implementation follows.
 
-### 2. "claimed" status is ambiguous
-The contract's `GET /claims?status=claimed` endpoint has a TODO in the yaml
-itself: "confirm other status values with team (pending? resolved?)".
-We interpreted "claimed" as claims with `status = 'APPROVED'` (i.e. the item
-was successfully returned to its owner), not `PENDING` (submitted but
-unreviewed).
+## Decisions carried over from Weeks 5–6
 
-**Needs team confirmation** that this interpretation is correct.
+### 1. No `/api` prefix
+The contract's paths have no prefix (`/claims`), but our website's routes use `/api` (`/api/claims` returns the logged-in student's own claims). The contract routes use the contract's exact paths, so the two never collide.
 
-### 3. schoolId is actually a school name string
-The contract's `GET /schools/{schoolId}/item-statistics` implies schools have
-a distinct ID. This schema has no such ID — `users.school` and `items.school`
-store the school's name as free text (e.g. "Riara University"). We treat the
-`{schoolId}` path parameter as that name string directly.
+### 2. `claimed` means an approved claim
+The 1.0.0 contract had a TODO on the status values. Our database uses `PENDING`, `APPROVED`, `REJECTED`; the contract uses `pending`, `claimed`, `rejected`, where **`claimed` = `APPROVED`**: the item was returned to that student.
 
-**Needs team discussion:** should schools get a real numeric/UUID ID in a
-future migration, or is the name-as-ID approach acceptable long-term?
+### 3. `schoolId` is the school's name
+Schools have no separate ID in our database; `users.school` and `items.school` store the name (e.g. "Strathmore University"). `{schoolId}` is that name, URL-encoded: `/schools/Strathmore%20University/item-statistics`.
+**Still open for the team:** give schools a real ID in a future version, or keep names as IDs.
 
-### 4. Fees and refunds are not implemented (GET side)
-`GET /claims/{claimId}/fees` and `GET /claims/{claimId}/refunds` are in the
-contract, but no "fee" or "refund" concept exists anywhere in the current
-database schema — no columns, no tables. Rather than inventing fake data to
-match the contract's response shape, both endpoints currently:
-- Return `404` if the claim itself doesn't exist
-- Return `501 Not Implemented` with an honest error message if the claim
-  exists but no fee/refund data can be provided
+### 4. Fees and refunds now exist
+Our database had no fees or refunds, so these endpoints couldn't return real data. We added two tables (`fees`, `refunds` in `server/schema.sql`):
+- A **handling fee** is recorded when a claim is approved. The amount is `CLAIM_FEE_CENTS` in `server/.env`, currently **10000 (KSh 100.00)**. **Team decision:** confirm this amount.
+- **Refunds** are partial or full refunds of that fee; their total can never exceed it.
 
-**Needs team decision:** design and build real `fees`/`refunds` tables, or
-remove these two endpoints from the contract if the feature isn't planned.
+## Changes in 2.1.0 (API security)
 
-### Everything else
-All other GET endpoints already existing in `index.js` prior to this week
-were left as-is (`/api/items`, `/api/students`, etc.) — they are not part of
-the current `openapi.yaml` contract, so nothing was checked or changed there.
+| # | Endpoint | What changed | Why |
+|---|---|---|---|
+| 11 | **All** | **Behaviour change:** every request needs an `X-API-Key` header with your team's key; missing or wrong key gets `401 {"error": "Missing or invalid API key"}` | Before this, anyone with our address could read every claim and refund. Each consumer gets its own key so we can tell callers apart and revoke one without breaking others |
+| 12 | **All** | **Behaviour change:** 100 requests per minute per key; request 101 gets `429` with a `Retry-After` header and `{"error": "Too many requests", "retryAfter": <seconds>}` | Stops one caller (or a buggy loop) from overloading the API for everyone |
 
-## Week 6 — Write Endpoints (Claims)
+Team 6: ask us for your key (we send it by direct message), put it in your `.env`, and send it as `X-API-Key` on every call. Nothing else about the requests or responses changed.
 
-No deviations. The write endpoints (`POST /claims`, `PATCH /claims/{claimId}`,
-`DELETE /claims/{claimId}`, `POST /claims/{claimId}/refunds`) were implemented
-exactly as defined in `openapi.yaml`. All validation rules, status codes, and
-response shapes match the contract as specified.
+## Changes in 2.0.0
 
-Testing confirmed:
+| # | Endpoint | What changed | Why |
+|---|---|---|---|
+| 1 | `GET /claims` | `status` enum widened from `[claimed]` to `[pending, claimed, rejected]` | Resolves the TODO; the database has all three, and `PATCH` already accepted all three |
+| 2 | `GET /claims` | **Behaviour change:** missing or unknown `status` returns `400` | The contract always marked `status` as required |
+| 3 | `POST /claims` | Success response now has a schema (the created claim); optional `evidence` field added; `404` (unknown student or item) and `409` (student found the item, item already returned, duplicate claim) added | 1.0.0 only said "Claim created." and didn't cover these cases |
+| 4 | `PATCH /claims/{claimId}` | Response schema added; `409` when another claim on the item is already approved, or the claim has refunds | An item can only have one owner. Approving rejects the other pending claims and records the fee |
+| 5 | `DELETE /claims/{claimId}` | Also deletes the claim's fee and refunds; the item becomes available again if this was the approved claim | 1.0.0 didn't say what happened to related data |
+| 6 | `GET /students/{studentId}/claims` | `studentId` is the school student ID (e.g. `SU-1001`). **Behaviour change:** a real student with no claims returns `200 []`; `404` only for an unknown student | Callers can tell "no claims yet" from "wrong ID" |
+| 7 | `GET /schools/{schoolId}/item-statistics` | `schoolName` now required; `totalItemsClaimed` documented as items returned to their owner | It's always returned; "claimed" needed one meaning |
+| 8 | `GET /claims/{claimId}/fees` | `404` can also mean "no fee has been charged on this claim yet" | Fees only exist after approval |
+| 9 | `GET /claims/{claimId}/refunds` | `refundedAt` now required | Every refund has one |
+| 10 | `POST /claims/{claimId}/refunds` | `amountCents` must be ≥ 1; `studentId` must be the claimant; `409` if the claim has no fee or the refund exceeds what's left of it; `201` returns the refund | 1.0.0 allowed zero, negative and oversized refunds |
+| 11 | All | Every error now uses `{"error": "..."}`, documented as a shared schema; unknown paths return JSON `404` | 1.0.0 only documented some errors |
 
-- Valid requests return the documented success status codes (201/200/204).
-- Missing/invalid fields return 400 with a clear error message.
-- Operations on nonexistent claims return 404.
+## Told Team 6
+
+- [ ] Sent `openapi.yaml` 2.0.0 and this file on [date] via [channel]
+- [ ] Team 6 confirmed the two behaviour changes (#2, #6) don't break their code
