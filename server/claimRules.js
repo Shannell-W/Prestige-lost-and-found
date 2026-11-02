@@ -4,6 +4,7 @@
 // Item status flow:  FOUND -> CLAIMED (has a pending claim) -> RETURNED (a claim was approved)
 // Claim status:      PENDING -> APPROVED or REJECTED
 const { withTransaction } = require("./db");
+const { resolveReportsForApprovedClaim } = require("./matching");
 
 // An error with an HTTP status, so routes can turn it straight into a response.
 class HttpError extends Error {
@@ -17,8 +18,9 @@ class HttpError extends Error {
 // TEAM DECISION: change CLAIM_FEE_CENTS in .env if you agree on a different amount.
 const CLAIM_FEE_CENTS = Number(process.env.CLAIM_FEE_CENTS || 10000);
 
-async function notify(conn, userId, message) {
-  await conn.query("INSERT INTO notifications (user_id, message) VALUES (?, ?)", [userId, message]);
+// itemId is optional; when given, the website links the notification to the item.
+async function notify(conn, userId, message, itemId = null) {
+  await conn.query("INSERT INTO notifications (user_id, message, item_id) VALUES (?, ?, ?)", [userId, message, itemId]);
 }
 
 // After a claim changes, set the item's status from what its claims now say.
@@ -42,7 +44,8 @@ async function refreshItemStatus(conn, itemId) {
 }
 
 // A student claims an item. Returns the new claim's id.
-async function submitClaim({ itemId, userId, evidence }) {
+// offeredAmount (KSh, optional) is what the claimant offers to pay the finder.
+async function submitClaim({ itemId, userId, evidence, offeredAmount = null }) {
   return withTransaction(async (conn) => {
     const [[item]] = await conn.query("SELECT * FROM items WHERE id = ?", [itemId]);
     if (!item) throw new HttpError(404, "item not found");
@@ -61,14 +64,15 @@ async function submitClaim({ itemId, userId, evidence }) {
     if (existing.length > 0) throw new HttpError(409, "You have already claimed this item");
 
     const [result] = await conn.query(
-      "INSERT INTO claims (item_id, student_id, evidence, status) VALUES (?, ?, ?, 'PENDING')",
-      [itemId, userId, evidence]
+      "INSERT INTO claims (item_id, student_id, evidence, status, offered_amount) VALUES (?, ?, ?, 'PENDING', ?)",
+      [itemId, userId, evidence, offeredAmount]
     );
 
     // This was the missing step: the item now has a claim waiting for review,
     // which is what makes it show up on the finder's Posted page.
     await refreshItemStatus(conn, itemId);
-    await notify(conn, item.student_id, `Someone submitted a claim for your item "${item.title}".`);
+    const offerNote = offeredAmount != null ? ` They offer KSh ${Number(offeredAmount).toFixed(2)}.` : "";
+    await notify(conn, item.student_id, `Someone submitted a claim for your item "${item.title}".${offerNote}`, itemId);
 
     return result.insertId;
   });
@@ -115,6 +119,9 @@ async function setClaimStatus(claimId, newStatus) {
           CLAIM_FEE_CENTS,
         ]);
       }
+
+      // The owner got their item back, so their matching lost report is resolved (matching.js).
+      await resolveReportsForApprovedClaim(conn, claim);
     } else {
       // Moving away from APPROVED undoes the approval, unless money has already been refunded.
       if (claim.status === "APPROVED") {

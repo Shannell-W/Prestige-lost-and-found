@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { API_URL, apiFetch } from "../api";
+import { ksh } from "../money";
 
 function ItemDetails() {
   const { id } = useParams();
@@ -9,6 +10,10 @@ function ItemDetails() {
   const [error, setError] = useState("");
 
   const [evidence, setEvidence] = useState("");
+  // What the claimant offers the finder. Pre-filled from their lost report's offer when they come from a match.
+  const [offeredAmount, setOfferedAmount] = useState(
+    () => new URLSearchParams(window.location.search).get("offer") || ""
+  );
   const [claimMessage, setClaimMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -48,7 +53,7 @@ function ItemDetails() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ itemId: id, evidence }),
+        body: JSON.stringify({ itemId: id, evidence, offeredAmount: offeredAmount === "" ? undefined : offeredAmount }),
       });
 
       const data = await response.json();
@@ -96,6 +101,22 @@ function ItemDetails() {
                 rows={4}
                 value={evidence}
                 onChange={(e) => setEvidence(e.target.value)}
+              />
+            </div>
+
+            <div className="field">
+              <label htmlFor="offeredAmount">
+                Amount you'll pay the finder, KSh (optional
+                {Number(item.reward_amount) > 0 ? `; they ask ${ksh(item.reward_amount)}` : ""})
+              </label>
+              <input
+                id="offeredAmount"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder={Number(item.reward_amount) > 0 ? String(Number(item.reward_amount)) : "0"}
+                value={offeredAmount}
+                onChange={(e) => setOfferedAmount(e.target.value)}
               />
             </div>
 

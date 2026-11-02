@@ -58,6 +58,8 @@ function Notifications() {
           <a href="/dashboard">Dashboard</a>
           <a href="/items">Browse Items</a>
           <a href="/report">Report Found Item</a>
+          <a href="/report-lost">Report Lost Item</a>
+          <a href="/lost-reports">My Lost Reports</a>
           <a href="/claims">My Claims</a>
           <a href="/posted">My Posted Items</a>
           <a href="/notifications">Notifications</a>
@@ -93,6 +95,11 @@ function Notifications() {
                   }}
                 >
                   <p style={{ margin: 0 }}>{n.message}</p>
+                  {n.item_id && (
+                    <a className="link" href={`/items/${n.item_id}`} style={{ display: "inline-block", margin: "4px 12px 0 0" }}>
+                      View item →
+                    </a>
+                  )}
                   <small>
                     {new Date(n.created_at).toLocaleString()}
                   </small>

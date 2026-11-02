@@ -23,6 +23,8 @@ function Dashboard() {
           <a href="/dashboard">Dashboard</a>
           <a href="/items">Browse Items</a>
           <a href="/report">Report Found Item</a>
+          <a href="/report-lost">Report Lost Item</a>
+          <a href="/lost-reports">My Lost Reports</a>
           <a href="/claims">My Claims</a>
           <a href="/posted">My Posted Items</a>
           <a href="/notifications">Notifications</a>
@@ -56,6 +58,16 @@ function Dashboard() {
             <a href="/claims" className="feature-card glass">
               <h3>My Claims</h3>
               <p>Track your ownership claims.</p>
+            </a>
+
+            <a href="/report-lost" className="feature-card glass">
+              <h3>Report Lost Item</h3>
+              <p>Tell us what you lost. We'll show similar found items and notify you.</p>
+            </a>
+
+            <a href="/lost-reports" className="feature-card glass">
+              <h3>My Lost Reports</h3>
+              <p>See possible matches for things you lost.</p>
             </a>
           </div>
         </section>

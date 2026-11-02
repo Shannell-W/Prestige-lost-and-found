@@ -52,6 +52,8 @@ function Profile() {
           <a href="/dashboard">Dashboard</a>
           <a href="/items">Browse Items</a>
           <a href="/report">Report Found Item</a>
+          <a href="/report-lost">Report Lost Item</a>
+          <a href="/lost-reports">My Lost Reports</a>
           <a href="/claims">My Claims</a>
           <a href="/posted">My Posted Items</a>
           <a href="/notifications">Notifications</a>

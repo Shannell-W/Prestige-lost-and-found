@@ -11,6 +11,9 @@ import ReportItems from './pages/ReportItems';
 import Posted from './pages/Posted';
 import Profile from './pages/Profile';
 import Venues from './pages/Venues';
+import ReportLost from './pages/ReportLost';
+import MyLostReports from './pages/MyLostReports';
+import LostReportMatches from './pages/LostReportMatches';
 import ThemeToggle from './components/ThemeToggle';
 
 function App() {
@@ -30,6 +33,9 @@ function App() {
       <Route path="/posted" element={<Posted />} />
       <Route path="/profile" element={<Profile />} />
       <Route path="/venues" element={<Venues />} />
+      <Route path="/report-lost" element={<ReportLost />} />
+      <Route path="/lost-reports" element={<MyLostReports />} />
+      <Route path="/lost-reports/:id" element={<LostReportMatches />} />
     </Routes>
     </>
   );

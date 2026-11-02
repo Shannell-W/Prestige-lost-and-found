@@ -21,7 +21,7 @@ const rawRequest = supertest;
 // KU-2001 (Faith) at Kenyatta. Claim 1 is approved (with a fee of 10000 and a refund of 2500);
 // claims 2 and 3 are pending on item 2.
 async function resetDb() {
-  for (const table of ["refunds", "fees", "notifications", "claims", "items", "users"]) {
+  for (const table of ["lost_report_matches", "lost_reports", "refunds", "fees", "notifications", "claims", "items", "users"]) {
     await pool.query(`DELETE FROM ${table}`);
   }
   await seed(pool);

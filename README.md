@@ -258,6 +258,8 @@ npm run seed
 
 In PowerShell, `<` doesn't work. Use `Get-Content schema.sql | mysql -u root -p` instead, or paste the contents of `schema.sql` into the MySQL Command Line Client.
 
+**Already have a database from before lost reports?** Don't drop it. Run `npm run migrate` instead: it adds the new tables (`lost_reports`, `lost_report_matches`) and columns (`notifications.item_id`, `claims.offered_amount`) and keeps your data. It is safe to run more than once.
+
 Start it:
 
 ```
@@ -298,6 +300,17 @@ The tests build their own database, `prestige_db_test`, so they never touch your
 
 ---
 
+## Lost reports and matching
+
+A student who lost something reports it at **Report Lost Item** (`/report-lost`): what it is, category, where and when, and the reward they offer the finder.
+
+- If similar found items already exist **in their school**, they go straight to a **Possible matches** page, best match first, each showing the finder's asking reward next to their own offer, with a "This is mine, claim it" button.
+- If nothing matches yet, they are told so, and when someone later reports a similar found item they get a **notification that links to it**.
+- When claiming, the owner can enter the **amount they'll pay**; the finder sees it next to their own asking reward when reviewing claims, and approving the claim accepts that offer. Approving also marks the owner's lost report **RESOLVED**.
+- **Browse Items** has search plus category, status, school, location and date filters, starting on the student's own school.
+
+Website routes (all need a login): `POST /api/lost-reports`, `GET /api/lost-reports`, `GET /api/lost-reports/:id`, `GET /api/lost-reports/:id/matches`, `PATCH /api/lost-reports/:id` (`{"status":"CLOSED"|"OPEN"}`). `GET /api/items` also accepts `category`, `location`, `dateFrom`, `dateTo`. `POST /api/claims` accepts an optional `offeredAmount` (KSh). The partner API is unchanged.
+
 ## Our upstream partner (Week 10)
 
 The **Partner Venues** page (`/venues`) shows venues from **Team 4**. Team 4 told us to use their deployed server, `https://artist-api-server.onrender.com` (`GET /api/venues`, no key needed).
@@ -322,6 +335,9 @@ See [`INTEGRATION_LOG.md`](./INTEGRATION_LOG.md) for what happened during integr
 server/index.js            website routes (/api/...) and error handling
 server/routes/partnerVenues.js  venues from Team 4 (Week 10)
 server/routes/contract.js  the partner API (openapi.yaml)
+server/routes/lostReports.js  lost reports: report a lost item, see matches, close it
+server/matching.js         how lost reports are matched with found items (scoring rules at the top)
+server/migrate.js          `npm run migrate`: updates an existing database
 server/claimRules.js       claim rules shared by both
 server/db.js               MySQL connection
 server/schema.sql          tables;  server/seed.js  sample data

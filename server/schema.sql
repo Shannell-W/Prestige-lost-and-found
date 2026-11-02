@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS claims (
   student_id INT NOT NULL,                   -- the claimant: users.id
   evidence TEXT NOT NULL,                    -- why they believe it is theirs
   status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+  offered_amount DECIMAL(10,2) NULL,         -- what the claimant offers to pay the finder, in KSh (optional)
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_claims_item (item_id),
   INDEX idx_claims_student_status (student_id, status),
@@ -58,6 +59,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,                      -- who receives it: users.id
   message VARCHAR(500) NOT NULL,
+  item_id INT NULL,                          -- the found item this is about, if any (makes it clickable)
   is_read TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_notifications_user (user_id, is_read),
@@ -89,4 +91,41 @@ CREATE TABLE IF NOT EXISTS refunds (
   reason VARCHAR(500) NOT NULL,
   refunded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_refunds_claim (claim_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------------------------------------------------------------------
+-- Lost reports: a student announces something they lost, so it can be matched
+-- against found items. Already have a database with data? Run `npm run migrate`
+-- instead of this file; it adds these tables and the two new columns above.
+-- ---------------------------------------------------------------------------
+
+-- Status: OPEN (still looking), RESOLVED (their claim on a matching item was approved),
+-- CLOSED (the owner closed it, e.g. found it themselves).
+CREATE TABLE IF NOT EXISTS lost_reports (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(150) NOT NULL,
+  description TEXT,
+  category VARCHAR(50) NOT NULL,             -- same list as items.category
+  location VARCHAR(150) NULL,                -- where they think they lost it
+  date_lost DATE NOT NULL,
+  reward_offered DECIMAL(10,2) NOT NULL DEFAULT 0.00,  -- what the owner offers the finder, in KSh
+  status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
+  student_id INT NOT NULL,                   -- the owner: users.id
+  school VARCHAR(150) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_lost_reports_school_status (school, status),
+  INDEX idx_lost_reports_student (student_id),
+  CONSTRAINT fk_lost_reports_owner FOREIGN KEY (student_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Which found items have matched which lost reports, so an owner is notified once per item.
+CREATE TABLE IF NOT EXISTS lost_report_matches (
+  lost_report_id INT NOT NULL,
+  item_id INT NOT NULL,
+  score INT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (lost_report_id, item_id),
+  INDEX idx_matches_item (item_id),
+  CONSTRAINT fk_matches_report FOREIGN KEY (lost_report_id) REFERENCES lost_reports(id) ON DELETE CASCADE,
+  CONSTRAINT fk_matches_item FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

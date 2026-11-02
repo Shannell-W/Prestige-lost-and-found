@@ -7,6 +7,7 @@ const { pool } = require("./db");
 const { HttpError, submitClaim, setClaimStatus } = require("./claimRules");
 const contractRoutes = require("./routes/contract");
 const { requireApiKey, rateLimit, logKeysLoaded } = require("./security");
+const { notifyOwnersOfNewItem } = require("./matching");
 const path = require("path");
 
 const app = express();
@@ -203,7 +204,7 @@ app.post("/api/auth/login", async (req, res) => {
 
 app.get("/api/items", async (req, res) => {
   try {
-    const { studentId, status, school, search } = req.query;
+    const { studentId, status, school, search, category, location, dateFrom, dateTo } = req.query;
 
     let sql = "SELECT * FROM items WHERE 1=1";
     const params = [];
@@ -236,6 +237,29 @@ app.get("/api/items", async (req, res) => {
       const searchValue = `%${search}%`;
 
       params.push(searchValue, searchValue, searchValue, searchValue);
+    }
+
+    // Filters for the Browse Items page. Dates are YYYY-MM-DD; anything else is ignored.
+    if (category) {
+      sql += " AND category = ?";
+      params.push(category);
+    }
+
+    if (location) {
+      sql += " AND location LIKE ?";
+      params.push(`%${location}%`);
+    }
+
+    const isDate = (d) => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d);
+
+    if (isDate(dateFrom)) {
+      sql += " AND date_found >= ?";
+      params.push(dateFrom);
+    }
+
+    if (isDate(dateTo)) {
+      sql += " AND date_found <= ?";
+      params.push(dateTo);
     }
 
     sql += " ORDER BY created_at DESC";
@@ -355,6 +379,15 @@ app.post("/api/items", authenticateToken, async (req, res) => {
       ]
     );
 
+    // Tell students whose open lost reports look like this item (matching.js).
+    // A problem here must not undo the report itself, so it is only logged.
+    try {
+      const [[item]] = await pool.query("SELECT * FROM items WHERE id = ?", [result.insertId]);
+      await notifyOwnersOfNewItem(pool, item);
+    } catch (matchError) {
+      console.error("Lost-report matching failed:", matchError);
+    }
+
     res.status(201).json({
       message: "Found item reported successfully",
       itemId: result.insertId,
@@ -407,12 +440,22 @@ app.get("/api/items/:id/claims", authenticateToken, async (req, res) => {
 
 app.post("/api/claims", authenticateToken, async (req, res) => {
   try {
-    const { itemId, evidence } = req.body;
+    const { itemId, evidence, offeredAmount } = req.body;
 
     if (!itemId || !evidence) {
       return res.status(400).json({
         error: "Item and evidence are required",
       });
+    }
+
+    // Optional: what the claimant offers to pay the finder (KSh). The finder sees it when reviewing.
+    let offer = null;
+    if (offeredAmount !== undefined && offeredAmount !== null && offeredAmount !== "") {
+      offer = Number(offeredAmount);
+      if (!Number.isFinite(offer) || offer < 0 || offer > 1000000) {
+        return res.status(400).json({ error: "Offered amount must be a number from 0 to 1000000" });
+      }
+      offer = Math.round(offer * 100) / 100;
     }
 
     // Shared rules (claimRules.js): blocks claiming your own item or a returned one,
@@ -421,6 +464,7 @@ app.post("/api/claims", authenticateToken, async (req, res) => {
       itemId: Number(itemId),
       userId: req.user.id,
       evidence,
+      offeredAmount: offer,
     });
 
     res.status(201).json({
@@ -728,6 +772,12 @@ app.get("/api/statistics/lost-items", async (req, res) => {
 // =========================
 
 app.use(require("./routes/partnerVenues"));
+
+// =========================
+// LOST REPORTS: announce a lost item, see similar found items, get notified (routes/lostReports.js)
+// =========================
+
+app.use(require("./routes/lostReports")(authenticateToken));
 
 // =========================
 // PARTNER CONTRACT API (openapi.yaml) for Team 6
