@@ -495,7 +495,8 @@ app.get("/api/claims", authenticateToken, async (req, res) => {
         claims.*,
         items.title,
         items.category,
-        items.location
+        items.location,
+        items.reward_amount
       FROM claims
       JOIN items ON claims.item_id = items.id
       WHERE claims.student_id = ?
@@ -778,6 +779,10 @@ app.use(require("./routes/partnerVenues"));
 // =========================
 
 app.use(require("./routes/lostReports")(authenticateToken));
+
+// Unread counts and mark-as-read (routes/notifications.js); price offers on claims (routes/offers.js)
+app.use(require("./routes/notifications")(authenticateToken));
+app.use(require("./routes/offers")(authenticateToken));
 
 // =========================
 // PARTNER CONTRACT API (openapi.yaml) for Team 6

@@ -88,9 +88,16 @@ function ItemDetails() {
         {item.description && <p><strong>Description:</strong> {item.description}</p>}
         {item.reward_amount > 0 && <p><strong>Reward:</strong> {item.reward_amount}</p>}
 
-        {item.status === "FOUND" && (
+        {/* CLAIMED items can still be claimed: someone else's claim may be wrong, and the finder picks the real owner. */}
+        {(item.status === "FOUND" || item.status === "CLAIMED") && (
           <form className="form" onSubmit={handleClaim} style={{ marginTop: "20px" }}>
             <h3>Claim this item</h3>
+            {item.status === "CLAIMED" && (
+              <p className="muted">
+                Someone else has already claimed this item. If it's yours, claim it too: the finder compares the
+                proof and picks the real owner.
+              </p>
+            )}
             <div className="field">
               <label htmlFor="evidence">Proof of ownership</label>
               <textarea
@@ -128,7 +135,7 @@ function ItemDetails() {
           </form>
         )}
 
-        {item.status !== "FOUND" && (
+        {item.status !== "FOUND" && item.status !== "CLAIMED" && (
           <p style={{ marginTop: "20px" }}>
             This item is no longer available to claim (status: {item.status}).
           </p>

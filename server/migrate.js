@@ -15,6 +15,7 @@ const mysql = require("mysql2/promise");
 const NEW_COLUMNS = [
   { table: "notifications", column: "item_id", definition: "INT NULL AFTER `message`" },
   { table: "claims", column: "offered_amount", definition: "DECIMAL(10,2) NULL AFTER `status`" },
+  { table: "claims", column: "counter_amount", definition: "DECIMAL(10,2) NULL AFTER `offered_amount`" },
 ];
 
 // The CREATE TABLE statements from schema.sql (comments and CREATE DATABASE / USE removed).

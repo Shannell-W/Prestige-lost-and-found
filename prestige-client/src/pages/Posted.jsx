@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { API_URL, apiFetch } from "../api";
-import { ksh } from "../money";
+import ClaimPrice from "../components/ClaimPrice";
+import UnreadBadge from "../components/UnreadBadge";
 
 function Posted() {
   const user = JSON.parse(localStorage.getItem("user"));
@@ -108,7 +109,7 @@ function Posted() {
           <a href="/lost-reports">My Lost Reports</a>
           <a href="/claims">My Claims</a>
           <a href="/posted">My Posted Items</a>
-          <a href="/notifications">Notifications</a>
+          <a href="/notifications">Notifications<UnreadBadge /></a>
           <a href="/profile">Profile</a>
           <button className="side-link danger" onClick={logout}>
             Logout
@@ -161,11 +162,17 @@ function Posted() {
                         >
                           <p><strong>From:</strong> {claim.claimant_name}</p>
                           <p><strong>Proof:</strong> {claim.evidence}</p>
-                          <p>
-                            <strong>Offer:</strong>{" "}
-                            {claim.offered_amount != null ? ksh(claim.offered_amount) : "none given"}
-                            {Number(item.reward_amount) > 0 && <span className="muted"> (you asked {ksh(item.reward_amount)})</span>}
-                          </p>
+                          <ClaimPrice
+                            claim={claim}
+                            role="finder"
+                            askingReward={item.reward_amount}
+                            onUpdated={(updated) =>
+                              setClaimsByItem((prev) => ({
+                                ...prev,
+                                [item.id]: prev[item.id].map((x) => (x.id === updated.id ? updated : x)),
+                              }))
+                            }
+                          />
                           <p><strong>Status:</strong> {claim.status}</p>
 
                           {claim.status === "PENDING" && (

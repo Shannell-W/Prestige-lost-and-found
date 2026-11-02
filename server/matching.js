@@ -12,9 +12,9 @@
 //   each word shared between the two TITLES ............... +3
 //   each other word shared anywhere (title, description,
 //   location) ............................................. +1
-// Common words ("the", "a", "my", "lost"...) are ignored, plurals are folded ("keys" = "key"), and a few
-// synonyms are treated as the same word ("backpack" = "bag"). A pair needs at least one shared word and a
-// score of MIN_SCORE to count as a match.
+// Common words ("the", "a", "my", "lost"...) are ignored, plurals are folded ("keys" = "key"), a few
+// synonyms are treated as the same word ("backpack" = "bag"), and small spelling mistakes are forgiven
+// (see similarWord). A pair needs at least one shared word and a score of MIN_SCORE to count as a match.
 
 const MIN_SCORE = 4;
 const DATE_SLACK_DAYS = 2;
@@ -39,11 +39,15 @@ const SYNONYMS = {
   grey: "gray",
 };
 
+const SYNONYM_WORDS = new Set(Object.keys(SYNONYMS));
+
 function normalizeWord(word) {
   let w = word.toLowerCase();
   if (w.length > 3 && w.endsWith("es") && /(ss|sh|ch|x)es$/.test(w)) w = w.slice(0, -2);
   else if (w.length > 3 && w.endsWith("s") && !w.endsWith("ss")) w = w.slice(0, -1);
-  return SYNONYMS[w] || w;
+  if (SYNONYMS[w]) return SYNONYMS[w];
+  const misspeltSynonym = similarWord(w, SYNONYM_WORDS); // "bakpack" -> "backpack" -> "bag"
+  return misspeltSynonym ? SYNONYMS[misspeltSynonym] : w;
 }
 
 // Text -> a set of meaningful words.
@@ -69,22 +73,60 @@ function scorePair(report, item) {
   const reportAll = words(report.title, report.description, report.location);
   const itemAll = words(item.title, item.description, item.location);
 
+  // matched holds the FOUND item's spelling of each shared word, so a typo isn't shown back to the user.
   const matched = new Set();
+  const counted = new Set(); // the report's words already scored
   for (const w of reportTitle) {
-    if (itemTitle.has(w)) {
+    const hit = similarWord(w, itemTitle);
+    if (hit) {
       score += 3;
-      matched.add(w);
+      matched.add(hit);
+      counted.add(w);
     }
   }
   for (const w of reportAll) {
-    if (!matched.has(w) && itemAll.has(w)) {
+    if (counted.has(w)) continue;
+    const hit = similarWord(w, itemAll);
+    if (hit && !matched.has(hit)) {
       score += 1;
-      matched.add(w);
+      matched.add(hit);
+      counted.add(w);
     }
   }
 
   if (matched.size === 0) return { score: 0, matchedWords: [] };
   return { score, matchedWords: [...matched] };
+}
+
+// Number of single-letter edits between two words: insert, delete, change, or swap two
+// neighbouring letters ("keychian" -> "keychain" is one edit).
+function editDistance(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      }
+    }
+  }
+  return d[a.length][b.length];
+}
+
+// The word in `set` that is the same as `word`, allowing a typo: same first letter, and at most
+// 1 letter different for words of 6+ letters, 2 for 9+ letters. Short words and numbers must match exactly
+// (so "black" never matches "block", and "fx-991" never matches "fx-992").
+function similarWord(word, set) {
+  if (set.has(word)) return word;
+  if (word.length < 6 || /\d/.test(word)) return null;
+  const allowed = word.length >= 9 ? 2 : 1;
+  for (const other of set) {
+    if (other[0] !== word[0] || /\d/.test(other) || Math.abs(other.length - word.length) > allowed) continue;
+    if (editDistance(word, other) <= allowed) return other;
+  }
+  return null;
 }
 
 function confidence(score) {
@@ -124,8 +166,8 @@ async function recordMatches(conn, reportId, matches) {
 }
 
 // Found items (same school, not posted by the owner) that look like this lost report. Best match first.
-// Lists items that can still be claimed (FOUND), plus any the owner has already claimed, so a match
-// doesn't vanish from their page once they claim it. my_claim_status is their claim's status, or null.
+// Lists items that can still be claimed (FOUND, or CLAIMED by someone who may be wrong), plus any the owner's
+// claim was approved for, so a match doesn't vanish from their page. my_claim_status is their claim's status, or null.
 async function findMatchesForReport(conn, report) {
   const [items] = await conn.query(
     `SELECT items.*,
@@ -134,8 +176,8 @@ async function findMatchesForReport(conn, report) {
      FROM items
      WHERE items.school = ? AND items.student_id <> ?
        AND items.date_found >= DATE_SUB(?, INTERVAL ${DATE_SLACK_DAYS} DAY)
-       AND (items.status = 'FOUND' OR EXISTS (
-         SELECT 1 FROM claims c WHERE c.item_id = items.id AND c.student_id = ? AND c.status IN ('PENDING', 'APPROVED')))`,
+       AND (items.status IN ('FOUND', 'CLAIMED') OR EXISTS (
+         SELECT 1 FROM claims c WHERE c.item_id = items.id AND c.student_id = ? AND c.status = 'APPROVED'))`,
     [report.student_id, report.school, report.student_id, report.date_lost, report.student_id]
   );
   return items
@@ -191,6 +233,8 @@ module.exports = {
   MIN_SCORE,
   words,
   scorePair,
+  similarWord,
+  editDistance,
   confidence,
   findMatchesForReport,
   notifyOwnersOfNewItem,

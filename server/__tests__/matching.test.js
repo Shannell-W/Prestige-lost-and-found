@@ -1,5 +1,5 @@
 // The word matching in matching.js, without a database.
-const { words, scorePair, confidence, MIN_SCORE } = require("../matching");
+const { words, scorePair, similarWord, confidence, MIN_SCORE } = require("../matching");
 
 describe("words()", () => {
   it("drops common words, folds plurals and synonyms", () => {
@@ -39,5 +39,33 @@ describe("scorePair()", () => {
   it("a title word in the same category is enough", () => {
     const s = scorePair({ title: "Calculator", category: "Electronics" }, item);
     expect(s.score).toBeGreaterThanOrEqual(MIN_SCORE);
+  });
+});
+
+describe("spelling mistakes", () => {
+  it("forgives a small typo in longer words", () => {
+    expect(similarWord("calculater", new Set(["calculator"]))).toBe("calculator");
+    expect(similarWord("umbrela", new Set(["umbrella"]))).toBe("umbrella");
+    expect(similarWord("headfones", new Set(["headphones"]))).toBe("headphones"); // 2 edits, 9+ letters
+    expect(similarWord("keychian", new Set(["keychain"]))).toBe("keychain"); // swapped letters = 1 edit
+  });
+
+  it("a misspelt synonym still folds: 'bakpack' is a bag", () => {
+    expect(words("bakpack").has("bag")).toBe(true);
+  });
+
+  it("does not stretch short words, numbers, or different first letters", () => {
+    expect(similarWord("black", new Set(["block"]))).toBeNull();
+    expect(similarWord("fx991es", new Set(["fx992es"]))).toBeNull();
+    expect(similarWord("wallet", new Set(["mallet"]))).toBeNull();
+  });
+
+  it("a misspelt lost report still finds the item, and shows the item's spelling", () => {
+    const s = scorePair(
+      { title: "Casio calculater", category: "Electronics" },
+      { title: "Scientific calculator", description: "Casio fx-991ES", category: "Electronics", location: "Lab 3" }
+    );
+    expect(s.score).toBeGreaterThanOrEqual(MIN_SCORE);
+    expect(s.matchedWords).toContain("calculator");
   });
 });

@@ -152,6 +152,11 @@ function LostReportMatches() {
                       {m.my_claim_status === "APPROVED" && (
                         <span className="status-badge status-returned">Your claim was approved</span>
                       )}
+                      {!m.my_claim_status && m.status === "CLAIMED" && (
+                        <p className="muted" style={{ width: "100%" }}>
+                          Someone else has claimed this. If it's yours, claim it too: the finder picks the real owner.
+                        </p>
+                      )}
                       {!m.my_claim_status && (
                         <a className="btn btn-primary sm" href={`/items/${m.id}${offer > 0 ? `?offer=${offer}` : ""}`}>
                           This is mine, claim it

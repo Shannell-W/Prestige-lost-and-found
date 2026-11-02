@@ -84,7 +84,7 @@ describe("POST /api/lost-reports", () => {
     expect(res.body.matches).toEqual([]);
   });
 
-  it("only offers items that can still be claimed (FOUND)", async () => {
+  it("only offers items that can still be claimed (not RETURNED)", async () => {
     // Item 1 (black backpack) was already RETURNED.
     const brian = await loginAs("brian@strathmore.test");
     const res = await brian.post("/api/lost-reports", {
@@ -244,9 +244,21 @@ describe("Claiming a matched item, with a price from both sides", () => {
     expect(approved.body.map((m) => [m.id, m.my_claim_status])).toEqual([[4, "APPROVED"]]);
   });
 
-  it("an item someone else has claimed is not offered as a match", async () => {
+  it("an item someone else has claimed is still offered, since their claim may be wrong", async () => {
     const wanjiku = await loginAs("wanjiku@strathmore.test");
     await wanjiku.post("/api/claims", { itemId: 4, evidence: "Those are my keys from the gate" });
+    const amani = await loginAs("amani@strathmore.test");
+    const matches = (await amani.get("/api/lost-reports/1/matches")).body;
+    expect(matches.map((m) => [m.id, m.status, m.my_claim_status])).toEqual([[4, "CLAIMED", null]]);
+    // ...and the owner can claim it too.
+    expect((await amani.post("/api/claims", { itemId: 4, evidence: "Torch lens is cracked, blue sticker" })).status).toBe(201);
+  });
+
+  it("an item returned to someone else is no longer offered", async () => {
+    const wanjiku = await loginAs("wanjiku@strathmore.test");
+    const claim = await wanjiku.post("/api/claims", { itemId: 4, evidence: "Those are my keys from the gate" });
+    const brian = await loginAs("brian@strathmore.test");
+    await brian.patch(`/api/claims/${claim.body.claimId}`, { status: "APPROVED" });
     const amani = await loginAs("amani@strathmore.test");
     expect((await amani.get("/api/lost-reports/1/matches")).body).toEqual([]);
   });

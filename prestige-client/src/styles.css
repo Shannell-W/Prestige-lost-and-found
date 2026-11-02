@@ -113,7 +113,7 @@ body {
 .sidebar-brand p { color: var(--muted); font-size: .9rem; }
 .sidebar-nav { display: grid; gap: 10px; }
 
-.dashboard-main { padding: 16px 16px 32px 0; }
+.dashboard-main { padding: 16px 16px 32px 0; min-width: 0; } /* min-width: lets wide tables scroll inside their box on phones instead of widening the page */
 .dashboard-top {
   display: flex; justify-content: space-between; align-items: center;
   gap: 16px; padding: 18px; margin: 16px 0;

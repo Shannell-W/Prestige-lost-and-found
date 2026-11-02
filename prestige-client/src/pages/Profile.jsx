@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { API_URL, apiFetch } from "../api";
+import UnreadBadge from "../components/UnreadBadge";
 
 function Profile() {
   const [profile, setProfile] = useState(null);
@@ -56,7 +57,7 @@ function Profile() {
           <a href="/lost-reports">My Lost Reports</a>
           <a href="/claims">My Claims</a>
           <a href="/posted">My Posted Items</a>
-          <a href="/notifications">Notifications</a>
+          <a href="/notifications">Notifications<UnreadBadge /></a>
           <a href="/profile">Profile</a>
           <button className="side-link danger" onClick={logout}>
             Logout

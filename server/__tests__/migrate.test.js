@@ -45,6 +45,7 @@ it("adds the new tables and columns and keeps existing rows", async () => {
       "created table lost_report_matches",
       "added notifications.item_id",
       "added claims.offered_amount",
+      "added claims.counter_amount",
     ])
   );
   const [[note]] = await conn.query("SELECT message, item_id FROM notifications");

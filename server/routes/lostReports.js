@@ -118,7 +118,7 @@ module.exports = function lostReportRoutes(authenticateToken) {
       const [rows] = await pool.query(
         `SELECT lost_reports.*,
            (SELECT COUNT(*) FROM lost_report_matches m JOIN items i ON i.id = m.item_id
-            WHERE m.lost_report_id = lost_reports.id AND i.status = 'FOUND') AS match_count
+            WHERE m.lost_report_id = lost_reports.id AND i.status IN ('FOUND', 'CLAIMED')) AS match_count
          FROM lost_reports
          WHERE student_id = ?
          ORDER BY created_at DESC, id DESC`,

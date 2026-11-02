@@ -1,3 +1,5 @@
+import UnreadBadge from "../components/UnreadBadge";
+
 function Dashboard() {
   const user = JSON.parse(localStorage.getItem("user"));
 
@@ -27,7 +29,7 @@ function Dashboard() {
           <a href="/lost-reports">My Lost Reports</a>
           <a href="/claims">My Claims</a>
           <a href="/posted">My Posted Items</a>
-          <a href="/notifications">Notifications</a>
+          <a href="/notifications">Notifications<UnreadBadge /></a>
           <a href="/profile">Profile</a>
 
           <button className="side-link danger" onClick={logout}>

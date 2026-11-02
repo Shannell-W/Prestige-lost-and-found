@@ -258,7 +258,7 @@ npm run seed
 
 In PowerShell, `<` doesn't work. Use `Get-Content schema.sql | mysql -u root -p` instead, or paste the contents of `schema.sql` into the MySQL Command Line Client.
 
-**Already have a database from before lost reports?** Don't drop it. Run `npm run migrate` instead: it adds the new tables (`lost_reports`, `lost_report_matches`) and columns (`notifications.item_id`, `claims.offered_amount`) and keeps your data. It is safe to run more than once.
+**Already have a database from before lost reports?** Don't drop it. Run `npm run migrate` instead: it adds the new tables (`lost_reports`, `lost_report_matches`) and columns (`notifications.item_id`, `claims.offered_amount`, `claims.counter_amount`) and keeps your data. It is safe to run more than once.
 
 Start it:
 
@@ -306,10 +306,13 @@ A student who lost something reports it at **Report Lost Item** (`/report-lost`)
 
 - If similar found items already exist **in their school**, they go straight to a **Possible matches** page, best match first, each showing the finder's asking reward next to their own offer, with a "This is mine, claim it" button.
 - If nothing matches yet, they are told so, and when someone later reports a similar found item they get a **notification that links to it**.
-- When claiming, the owner can enter the **amount they'll pay**; the finder sees it next to their own asking reward when reviewing claims, and approving the claim accepts that offer. Approving also marks the owner's lost report **RESOLVED**.
+- When claiming, the owner can enter the **amount they'll pay**; the finder sees it next to their own asking reward when reviewing claims. While the claim is pending, the finder can **counter-offer**, and the owner can **accept** it or **make a new offer** (on My Claims). Approving the claim accepts the owner's current offer, and marks their lost report **RESOLVED**.
+- An item someone has already claimed can **still be claimed** by others (and is still shown as a match), so a wrong claim can't block the real owner; the finder compares the proof.
+- Matching forgives **small spelling mistakes** ("umbrela" finds "umbrella", "bakpack" finds "backpack").
+- The sidebar shows the number of **unread notifications**; opening Notifications marks them read.
 - **Browse Items** has search plus category, status, school, location and date filters, starting on the student's own school.
 
-Website routes (all need a login): `POST /api/lost-reports`, `GET /api/lost-reports`, `GET /api/lost-reports/:id`, `GET /api/lost-reports/:id/matches`, `PATCH /api/lost-reports/:id` (`{"status":"CLOSED"|"OPEN"}`). `GET /api/items` also accepts `category`, `location`, `dateFrom`, `dateTo`. `POST /api/claims` accepts an optional `offeredAmount` (KSh). The partner API is unchanged.
+Website routes (all need a login): `POST /api/lost-reports`, `GET /api/lost-reports`, `GET /api/lost-reports/:id`, `GET /api/lost-reports/:id/matches`, `PATCH /api/lost-reports/:id` (`{"status":"CLOSED"|"OPEN"}`). `GET /api/items` also accepts `category`, `location`, `dateFrom`, `dateTo`. `POST /api/claims` accepts an optional `offeredAmount` (KSh). Price: `PATCH /api/claims/:id/offer` and `POST /api/claims/:id/accept-counter` (claimant), `PATCH /api/claims/:id/counter` (finder), each with `{"amount": 250}` where needed. Notifications: `GET /api/notifications/unread-count`, `POST /api/notifications/read-all`, `PATCH /api/notifications/:id/read`. The partner API is unchanged.
 
 ## Our upstream partner (Week 10)
 
@@ -338,6 +341,8 @@ server/routes/contract.js  the partner API (openapi.yaml)
 server/routes/lostReports.js  lost reports: report a lost item, see matches, close it
 server/matching.js         how lost reports are matched with found items (scoring rules at the top)
 server/migrate.js          `npm run migrate`: updates an existing database
+server/routes/offers.js    agreeing a price on a claim (offer, counter-offer, accept)
+server/routes/notifications.js  unread count, mark as read
 server/claimRules.js       claim rules shared by both
 server/db.js               MySQL connection
 server/schema.sql          tables;  server/seed.js  sample data

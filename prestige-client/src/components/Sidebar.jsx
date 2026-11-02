@@ -1,3 +1,5 @@
+import UnreadBadge from "./UnreadBadge";
+
 // The logged-in sidebar, used by the lost-report pages. Same links and look as the other pages' sidebars.
 function Sidebar() {
   const user = JSON.parse(localStorage.getItem("user"));
@@ -26,7 +28,7 @@ function Sidebar() {
         <a href="/lost-reports">My Lost Reports</a>
         <a href="/claims">My Claims</a>
         <a href="/posted">My Posted Items</a>
-        <a href="/notifications">Notifications</a>
+        <a href="/notifications">Notifications<UnreadBadge /></a>
         <a href="/profile">Profile</a>
         <button className="side-link danger" onClick={logout}>
           Logout

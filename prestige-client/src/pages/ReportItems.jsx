@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { APP_CONFIG } from "../config";
 import { API_URL, apiFetch } from "../api";
+import UnreadBadge from "../components/UnreadBadge";
 
 function ReportItems() {
   const [title, setTitle] = useState("");
@@ -87,7 +88,7 @@ function ReportItems() {
           <a href="/lost-reports">My Lost Reports</a>
           <a href="/claims">My Claims</a>
           <a href="/posted">My Posted Items</a>
-          <a href="/notifications">Notifications</a>
+          <a href="/notifications">Notifications<UnreadBadge /></a>
           <a href="/profile">Profile</a>
           <button className="side-link danger" onClick={logout}>
             Logout

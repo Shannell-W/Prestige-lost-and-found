@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { API_URL, apiFetch } from "../api";
+import UnreadBadge from "../components/UnreadBadge";
 
 function Notifications() {
   const user = JSON.parse(localStorage.getItem("user"));
@@ -29,6 +30,13 @@ function Notifications() {
       .then((data) => {
         setNotifications(data);
         setLoading(false);
+        // They've now been seen. The ones that were unread keep their "New" label until the page is left.
+        if (data.some((n) => !n.is_read)) {
+          apiFetch(`${API_URL}/api/notifications/read-all`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+          }).catch((err) => console.error(err));
+        }
       })
       .catch((err) => {
         console.error(err);
@@ -62,7 +70,7 @@ function Notifications() {
           <a href="/lost-reports">My Lost Reports</a>
           <a href="/claims">My Claims</a>
           <a href="/posted">My Posted Items</a>
-          <a href="/notifications">Notifications</a>
+          <a href="/notifications">Notifications<UnreadBadge /></a>
           <a href="/profile">Profile</a>
           <button className="side-link danger" onClick={logout}>
             Logout
@@ -94,7 +102,12 @@ function Notifications() {
                     opacity: n.is_read ? 0.6 : 1,
                   }}
                 >
-                  <p style={{ margin: 0 }}>{n.message}</p>
+                  <p style={{ margin: 0 }}>
+                    {!n.is_read && (
+                      <span className="status-badge status-claimed" style={{ marginRight: "8px", padding: "2px 8px" }}>New</span>
+                    )}
+                    {n.message}
+                  </p>
                   {n.item_id && (
                     <a className="link" href={`/items/${n.item_id}`} style={{ display: "inline-block", margin: "4px 12px 0 0" }}>
                       View item →

@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS claims (
   evidence TEXT NOT NULL,                    -- why they believe it is theirs
   status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
   offered_amount DECIMAL(10,2) NULL,         -- what the claimant offers to pay the finder, in KSh (optional)
+  counter_amount DECIMAL(10,2) NULL,         -- the finder's counter-offer, waiting for the claimant's answer
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_claims_item (item_id),
   INDEX idx_claims_student_status (student_id, status),
@@ -96,7 +97,7 @@ CREATE TABLE IF NOT EXISTS refunds (
 -- ---------------------------------------------------------------------------
 -- Lost reports: a student announces something they lost, so it can be matched
 -- against found items. Already have a database with data? Run `npm run migrate`
--- instead of this file; it adds these tables and the two new columns above.
+-- instead of this file; it adds these tables and the new columns above.
 -- ---------------------------------------------------------------------------
 
 -- Status: OPEN (still looking), RESOLVED (their claim on a matching item was approved),

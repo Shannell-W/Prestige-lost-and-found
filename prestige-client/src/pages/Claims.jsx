@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { API_URL, apiFetch } from "../api";
+import UnreadBadge from "../components/UnreadBadge";
+import ClaimPrice from "../components/ClaimPrice";
 
 function Claims() {
   const user = JSON.parse(localStorage.getItem("user"));
@@ -57,7 +59,7 @@ function Claims() {
           <a href="/lost-reports">My Lost Reports</a>
           <a href="/claims">My Claims</a>
           <a href="/posted">My Posted Items</a>
-          <a href="/notifications">Notifications</a>
+          <a href="/notifications">Notifications<UnreadBadge /></a>
           <a href="/profile">Profile</a>
           <button className="side-link danger" onClick={logout}>
             Logout
@@ -86,6 +88,7 @@ function Claims() {
                     <th style={{ padding: "15px" }}>Category</th>
                     <th style={{ padding: "15px" }}>Location</th>
                     <th style={{ padding: "15px" }}>Status</th>
+                    <th style={{ padding: "15px" }}>Price</th>
                     <th style={{ padding: "15px" }}>Submitted</th>
                   </tr>
                 </thead>
@@ -96,6 +99,14 @@ function Claims() {
                       <td style={{ padding: "15px" }}>{c.category}</td>
                       <td style={{ padding: "15px" }}>{c.location}</td>
                       <td style={{ padding: "15px" }}>{c.status}</td>
+                      <td style={{ padding: "15px", minWidth: "240px" }}>
+                        <ClaimPrice
+                          claim={c}
+                          role="claimant"
+                          askingReward={c.reward_amount}
+                          onUpdated={(updated) => setClaims((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))}
+                        />
+                      </td>
                       <td style={{ padding: "15px" }}>
                         {new Date(c.created_at).toLocaleDateString()}
                       </td>
