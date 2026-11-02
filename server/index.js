@@ -8,6 +8,8 @@ const { HttpError, submitClaim, setClaimStatus } = require("./claimRules");
 const contractRoutes = require("./routes/contract");
 const { requireApiKey, rateLimit, logKeysLoaded } = require("./security");
 const { notifyOwnersOfNewItem } = require("./matching");
+const { normalizePhone } = require("./alerts");
+const { publicItem } = require("./routes/account");
 const path = require("path");
 
 const app = express();
@@ -64,6 +66,10 @@ app.get("/api/health", (req, res) => {
 // API docs (Week 8): the contract rendered with Swagger UI at http://localhost:5000/docs/
 // Open so a new consumer can read how to authenticate before they have a key.
 app.use("/docs", express.static(path.join(__dirname, "..", "docs")));
+// Photos of found items (routes/uploads.js). Open, like the docs, because an <img> tag can't send an
+// API key. File names are random, and only images are ever saved here.
+app.use("/uploads", express.static(require("./routes/uploads").UPLOAD_DIR, { maxAge: "7d", index: false }));
+
 app.get("/openapi.yaml", (req, res) => {
   res.type("text/yaml").sendFile(path.join(__dirname, "..", "openapi.yaml"));
 });
@@ -76,6 +82,8 @@ app.get("/openapi.yaml", (req, res) => {
 
 app.use(requireApiKey);
 app.use(rateLimit);
+// Photo uploads need a bigger body limit than everything else, so they're parsed before the normal JSON limit.
+app.use(require("./routes/uploads")(authenticateToken));
 app.use(express.json());
 
 // =========================
@@ -84,7 +92,7 @@ app.use(express.json());
 
 app.post("/api/auth/register", async (req, res) => {
   try {
-    const { name, studentId, school, email, password, confirmPassword } =
+    const { name, studentId, school, email, password, confirmPassword, phone } =
       req.body;
 
     if (
@@ -106,6 +114,12 @@ app.post("/api/auth/register", async (req, res) => {
       });
     }
 
+    // Optional phone for SMS alerts, e.g. 0712345678 or +254712345678.
+    const cleanPhone = phone ? normalizePhone(phone) : null;
+    if (phone && !cleanPhone) {
+      return res.status(400).json({ error: "Phone must be a Kenyan mobile number, e.g. 0712345678" });
+    }
+
     const [existing] = await pool.query(
       "SELECT id FROM users WHERE email = ? OR student_id = ?",
       [email, studentId]
@@ -121,9 +135,9 @@ app.post("/api/auth/register", async (req, res) => {
 
     const [result] = await pool.query(
       `INSERT INTO users
-      (full_name, student_id, school, email, password)
-      VALUES (?, ?, ?, ?, ?)`,
-      [name, studentId, school, email, hashedPassword]
+      (full_name, student_id, school, email, password, phone)
+      VALUES (?, ?, ?, ?, ?, ?)`,
+      [name, studentId, school, email, hashedPassword, cleanPhone]
     );
 
     res.status(201).json({
@@ -266,7 +280,7 @@ app.get("/api/items", async (req, res) => {
 
     const [rows] = await pool.query(sql, params);
 
-    res.json(rows);
+    res.json(rows.map(publicItem));
   } catch (error) {
     console.error(error);
     res.status(500).json({
@@ -330,7 +344,7 @@ app.get("/api/items/:id", async (req, res) => {
       });
     }
 
-    res.json(rows[0]);
+    res.json(publicItem(rows[0]));
   } catch (error) {
     console.error(error);
     res.status(500).json({
@@ -353,6 +367,9 @@ app.post("/api/items", authenticateToken, async (req, res) => {
       dateFound,
       rewardAmount,
       imageUrl,
+      handover,
+      handoverNote,
+      checkQuestion,
     } = req.body;
 
     if (!title || !category || !location || !dateFound) {
@@ -361,11 +378,24 @@ app.post("/api/items", authenticateToken, async (req, res) => {
       });
     }
 
+    // Where the owner collects it: the finder keeps it (default), or it was handed to campus security.
+    const handoverType = handover || "FINDER";
+    if (!["FINDER", "SECURITY"].includes(handoverType)) {
+      return res.status(400).json({ error: "Handover must be FINDER or SECURITY" });
+    }
+    if (handoverNote != null && (typeof handoverNote !== "string" || handoverNote.length > 255)) {
+      return res.status(400).json({ error: "Pickup details must be text of 255 characters or fewer" });
+    }
+    if (checkQuestion != null && (typeof checkQuestion !== "string" || checkQuestion.length > 255)) {
+      return res.status(400).json({ error: "Check question must be text of 255 characters or fewer" });
+    }
+
     const [result] = await pool.query(
       `INSERT INTO items
       (title, description, category, location, date_found,
-       status, student_id, school, reward_amount, image_url)
-      VALUES (?, ?, ?, ?, ?, 'FOUND', ?, ?, ?, ?)`,
+       status, student_id, school, reward_amount, image_url,
+       handover, handover_note, check_question)
+      VALUES (?, ?, ?, ?, ?, 'FOUND', ?, ?, ?, ?, ?, ?, ?)`,
       [
         title,
         description || "",
@@ -376,14 +406,19 @@ app.post("/api/items", authenticateToken, async (req, res) => {
         req.user.school,
         rewardAmount || 0,
         imageUrl || null,
+        handoverType,
+        (handoverNote || "").trim() || null,
+        (checkQuestion || "").trim() || null,
       ]
     );
 
     // Tell students whose open lost reports look like this item (matching.js).
     // A problem here must not undo the report itself, so it is only logged.
+    // lookingCount: how many students were told, shown to the finder.
+    let lookingCount = 0;
     try {
       const [[item]] = await pool.query("SELECT * FROM items WHERE id = ?", [result.insertId]);
-      await notifyOwnersOfNewItem(pool, item);
+      lookingCount = await notifyOwnersOfNewItem(pool, item);
     } catch (matchError) {
       console.error("Lost-report matching failed:", matchError);
     }
@@ -391,6 +426,7 @@ app.post("/api/items", authenticateToken, async (req, res) => {
     res.status(201).json({
       message: "Found item reported successfully",
       itemId: result.insertId,
+      lookingCount,
     });
   } catch (error) {
     console.error(error);
@@ -440,7 +476,7 @@ app.get("/api/items/:id/claims", authenticateToken, async (req, res) => {
 
 app.post("/api/claims", authenticateToken, async (req, res) => {
   try {
-    const { itemId, evidence, offeredAmount } = req.body;
+    const { itemId, evidence, offeredAmount, checkAnswer } = req.body;
 
     if (!itemId || !evidence) {
       return res.status(400).json({
@@ -458,6 +494,13 @@ app.post("/api/claims", authenticateToken, async (req, res) => {
       offer = Math.round(offer * 100) / 100;
     }
 
+    // If the finder set a check question, the claimant must answer it.
+    const [[question]] = await pool.query("SELECT check_question FROM items WHERE id = ?", [Number(itemId)]);
+    const answer = typeof checkAnswer === "string" ? checkAnswer.trim() : "";
+    if (question && question.check_question && !answer) {
+      return res.status(400).json({ error: "Please answer the finder's question" });
+    }
+
     // Shared rules (claimRules.js): blocks claiming your own item or a returned one,
     // blocks duplicate claims, sets the item to CLAIMED, and notifies the finder.
     const claimId = await submitClaim({
@@ -465,6 +508,7 @@ app.post("/api/claims", authenticateToken, async (req, res) => {
       userId: req.user.id,
       evidence,
       offeredAmount: offer,
+      checkAnswer: answer || null,
     });
 
     res.status(201).json({
@@ -667,6 +711,9 @@ app.get("/api/profile", authenticateToken, async (req, res) => {
         student_id,
         school,
         email,
+        phone,
+        alerts_email,
+        alerts_sms,
         created_at
        FROM users
        WHERE id = ?`,
@@ -784,6 +831,9 @@ app.use(require("./routes/lostReports")(authenticateToken));
 app.use(require("./routes/notifications")(authenticateToken));
 app.use(require("./routes/offers")(authenticateToken));
 
+// Profile settings, pickup details after approval, and website statistics (routes/account.js)
+app.use(require("./routes/account").router(authenticateToken));
+
 // =========================
 // PARTNER CONTRACT API (openapi.yaml) for Team 6
 // =========================
@@ -817,6 +867,7 @@ if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
     logKeysLoaded();
+    require("./reminders").startReminders();
   });
 }
 

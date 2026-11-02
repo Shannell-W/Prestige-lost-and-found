@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { API_URL, apiFetch } from "../api";
 import { APP_CONFIG } from "../config";
+import { StatusBadge, statusLabel } from "../labels";
+import Sidebar from "../components/Sidebar";
 
 // Filters start on the student's own school (everything, if not logged in).
 function initialFilters() {
@@ -45,32 +47,11 @@ function Items() {
     return () => clearTimeout(timer);
   }, [filters]);
 
-  return (
+  // Logged in: the same sidebar as the rest of the portal. Logged out: the public header.
+  const loggedIn = Boolean(localStorage.getItem("token"));
+
+  const content = (
     <>
-      <header className="topbar glass">
-        <div className="container nav">
-          <div className="brand">
-            <div className="brand-mark">CLF</div>
-
-            <div>
-              <h1>Campus Lost & Found</h1>
-              <p>Student recovery network</p>
-            </div>
-          </div>
-
-          <div className="nav-actions">
-            <a href="/" className="btn btn-outline">
-              Home
-            </a>
-
-            <a href="/login" className="btn btn-primary">
-              Login
-            </a>
-          </div>
-        </div>
-      </header>
-
-      <main className="container section">
         <h2 className="section-title">Found Items</h2>
 
         <p style={{ marginBottom: "14px" }}>
@@ -106,7 +87,7 @@ function Items() {
               <select id="status" value={filters.status} onChange={(e) => setFilter("status", e.target.value)}>
                 <option value="">Any status</option>
                 {APP_CONFIG.statuses.map((st) => (
-                  <option key={st} value={st}>{st}</option>
+                  <option key={st} value={st}>{statusLabel("item", st)}</option>
                 ))}
               </select>
             </div>
@@ -196,7 +177,7 @@ function Items() {
                     </td>
 
                     <td style={{ padding: "15px" }}>
-                      {item.status}
+                      <StatusBadge kind="item" status={item.status} />
                     </td>
                   </tr>
                 ))}
@@ -208,7 +189,46 @@ function Items() {
         {!loading && !error && items.length === 0 && (
           <p>No found items match these filters.</p>
         )}
-      </main>
+    </>
+  );
+
+  if (loggedIn) {
+    return (
+      <div className="dashboard-layout">
+        <Sidebar />
+        <main className="dashboard-main">
+          <section className="section">{content}</section>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <header className="topbar glass">
+        <div className="container nav">
+          <div className="brand">
+            <div className="brand-mark">CLF</div>
+
+            <div>
+              <h1>Campus Lost & Found</h1>
+              <p>Student recovery network</p>
+            </div>
+          </div>
+
+          <div className="nav-actions">
+            <a href="/" className="btn btn-outline">
+              Home
+            </a>
+
+            <a href="/login" className="btn btn-primary">
+              Login
+            </a>
+          </div>
+        </div>
+      </header>
+
+      <main className="container section">{content}</main>
     </>
   );
 }

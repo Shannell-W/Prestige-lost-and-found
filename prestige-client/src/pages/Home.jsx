@@ -1,4 +1,17 @@
+import { useEffect, useState } from "react";
+import { API_URL, apiFetch } from "../api";
+
 function Home() {
+  // Real numbers from the server; the cards show "—" until they arrive (or if the server is down).
+  const [stats, setStats] = useState(null);
+  useEffect(() => {
+    apiFetch(`${API_URL}/api/statistics/summary`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then(setStats)
+      .catch(() => setStats(null));
+  }, []);
+  const show = (n) => (stats ? Number(n).toLocaleString() : "—");
+
   return (
     <>
       <header className="topbar glass">
@@ -27,18 +40,22 @@ function Home() {
               and let finders review evidence securely within each school portal.
             </p>
             <div className="hero-actions">
-              <a href="/register" className="btn btn-primary">Get Started</a>
-              <a href="/login" className="btn btn-secondary">Enter Portal</a>
+              <a href="/report-lost" className="btn btn-primary">I lost something</a>
+              <a href="/report" className="btn btn-secondary">I found something</a>
             </div>
+            <p className="muted" style={{ marginTop: "12px" }}>
+              New here? <a className="link" href="/register">Create an account</a> or{" "}
+              <a className="link" href="/items">browse found items</a>.
+            </p>
           </div>
           <div className="hero-card glass fade-in delay-1">
             <h3>How it works</h3>
             <ul>
               <li>1. Sign up with your student account</li>
               <li>2. Enter your school portal</li>
-              <li>3. Browse or report found items</li>
-              <li>4. Submit proof to claim ownership</li>
-              <li>5. Founder reviews and approves real owner</li>
+              <li>3. Lost something? Report it: we show similar found items and text you when one turns up</li>
+              <li>4. Found something? Post a photo in 30 seconds</li>
+              <li>5. The owner proves it's theirs; the finder approves and you agree a reward</li>
             </ul>
           </div>
         </section>
@@ -74,10 +91,10 @@ function Home() {
         <section className="container section">
           <h3 className="section-title">Platform statistics</h3>
           <div className="stats-grid">
-            <div className="stat glass"><strong>100+</strong><span>Items Posted</span></div>
-            <div className="stat glass"><strong>100+</strong><span>Claims Submitted</span></div>
-            <div className="stat glass"><strong>150+</strong><span>Items Returned</span></div>
-            <div className="stat glass"><strong>20+</strong><span>School Portals</span></div>
+            <div className="stat glass"><strong>{show(stats?.itemsPosted)}</strong><span>Items Posted</span></div>
+            <div className="stat glass"><strong>{show(stats?.itemsReturned)}</strong><span>Items Returned</span></div>
+            <div className="stat glass"><strong>{show(stats?.studentsLooking)}</strong><span>Students Looking Now</span></div>
+            <div className="stat glass"><strong>{show(stats?.schools)}</strong><span>Schools</span></div>
           </div>
         </section>
 

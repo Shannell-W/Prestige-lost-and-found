@@ -9,7 +9,8 @@
 //   PATCH /api/claims/:id/counter         { amount }  finder: ask for a different amount
 //   POST  /api/claims/:id/accept-counter              claimant: agree to the finder's amount
 const express = require("express");
-const { pool, withTransaction } = require("../db");
+const { withTransaction } = require("../db");
+const { addNotification } = require("../notify");
 
 const MAX_AMOUNT = 1000000; // KSh; a sanity limit
 
@@ -41,7 +42,7 @@ async function loadClaim(conn, claimId, userId, role) {
 }
 
 async function notify(conn, userId, message, itemId) {
-  await conn.query("INSERT INTO notifications (user_id, message, item_id) VALUES (?, ?, ?)", [userId, message, itemId]);
+  await addNotification(conn, userId, message, { itemId });
 }
 
 module.exports = function offerRoutes(authenticateToken) {

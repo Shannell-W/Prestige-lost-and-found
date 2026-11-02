@@ -11,5 +11,22 @@ export const APP_CONFIG = {
     "Jomo Kenyatta University of Agriculture and Technology"
   ],
   categories: ["Electronics", "Clothing", "Documents", "Accessories", "Other"],
-  statuses: ["FOUND", "CLAIMED", "RETURNED", "CLOSED"]
+  statuses: ["FOUND", "CLAIMED", "RETURNED", "CLOSED"],
+  // Suggestions for "where" fields (students can still type anything). Same words help matching.
+  campusPlaces: [
+    "Library",
+    "Cafeteria",
+    "Main gate",
+    "Lecture hall",
+    "Computer lab",
+    "Science lab",
+    "Hostel",
+    "Sports complex",
+    "Parking",
+    "Chapel",
+    "Admin block",
+    "Student centre",
+    "Bus stop",
+    "Washrooms"
+  ]
 };

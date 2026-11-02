@@ -1,6 +1,6 @@
 import UnreadBadge from "./UnreadBadge";
 
-// The logged-in sidebar, used by the lost-report pages. Same links and look as the other pages' sidebars.
+// The logged-in sidebar, shared by every portal page (one place to add a link).
 function Sidebar() {
   const user = JSON.parse(localStorage.getItem("user"));
 
@@ -23,8 +23,8 @@ function Sidebar() {
       <nav className="sidebar-nav">
         <a href="/dashboard">Dashboard</a>
         <a href="/items">Browse Items</a>
-        <a href="/report">Report Found Item</a>
-        <a href="/report-lost">Report Lost Item</a>
+        <a href="/report-lost">I Lost Something</a>
+        <a href="/report">I Found Something</a>
         <a href="/lost-reports">My Lost Reports</a>
         <a href="/claims">My Claims</a>
         <a href="/posted">My Posted Items</a>

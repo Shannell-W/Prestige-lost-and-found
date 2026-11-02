@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS users (
   school VARCHAR(150) NOT NULL,              -- school name, e.g. 'Strathmore University'
   email VARCHAR(160) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,            -- bcrypt hash, never the plain password
+  phone VARCHAR(20) NULL,                    -- optional, +2547XXXXXXXX, for SMS alerts
+  alerts_email TINYINT(1) NOT NULL DEFAULT 1,  -- send notifications by email too
+  alerts_sms TINYINT(1) NOT NULL DEFAULT 1,    -- send notifications by SMS too (needs a phone)
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -35,6 +38,9 @@ CREATE TABLE IF NOT EXISTS items (
   school VARCHAR(150) NOT NULL,
   reward_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,   -- in KSh
   image_url VARCHAR(500) NULL,
+  handover VARCHAR(20) NOT NULL DEFAULT 'FINDER',  -- where the owner collects it: FINDER (finder keeps it) or SECURITY (handed to campus security)
+  handover_note VARCHAR(255) NULL,           -- pickup details, shown only to the owner once their claim is approved
+  check_question VARCHAR(255) NULL,          -- a question only the owner can answer, asked when claiming
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_items_school_status (school, status),
   CONSTRAINT fk_items_finder FOREIGN KEY (student_id) REFERENCES users(id)
@@ -49,6 +55,7 @@ CREATE TABLE IF NOT EXISTS claims (
   status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
   offered_amount DECIMAL(10,2) NULL,         -- what the claimant offers to pay the finder, in KSh (optional)
   counter_amount DECIMAL(10,2) NULL,         -- the finder's counter-offer, waiting for the claimant's answer
+  check_answer TEXT NULL,                    -- the claimant's answer to items.check_question
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_claims_item (item_id),
   INDEX idx_claims_student_status (student_id, status),
@@ -61,6 +68,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   user_id INT NOT NULL,                      -- who receives it: users.id
   message VARCHAR(500) NOT NULL,
   item_id INT NULL,                          -- the found item this is about, if any (makes it clickable)
+  lost_report_id INT NULL,                   -- the lost report this is about, if any
   is_read TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_notifications_user (user_id, is_read),
@@ -111,6 +119,7 @@ CREATE TABLE IF NOT EXISTS lost_reports (
   date_lost DATE NOT NULL,
   reward_offered DECIMAL(10,2) NOT NULL DEFAULT 0.00,  -- what the owner offers the finder, in KSh
   status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
+  reminded_at DATETIME NULL,                 -- last "still looking?" reminder (every 30 days while OPEN)
   student_id INT NOT NULL,                   -- the owner: users.id
   school VARCHAR(150) NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

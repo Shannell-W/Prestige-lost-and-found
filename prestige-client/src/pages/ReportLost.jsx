@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { APP_CONFIG } from "../config";
 import { API_URL, apiFetch } from "../api";
 import Sidebar from "../components/Sidebar";
@@ -19,13 +19,17 @@ function ReportLost() {
 
   const today = new Date().toISOString().slice(0, 10);
 
+  useEffect(() => {
+    if (!localStorage.getItem("token")) window.location.href = "/login?next=/report-lost";
+  }, []);
+
   async function handleSubmit(e) {
     e.preventDefault();
     setMessage("");
 
     const token = localStorage.getItem("token");
     if (!token) {
-      window.location.href = "/login";
+      window.location.href = "/login?next=/report-lost";
       return;
     }
 
@@ -70,7 +74,7 @@ function ReportLost() {
 
       <main className="dashboard-main">
         <header className="dashboard-top glass">
-          <h2>Report Lost Item</h2>
+          <h2>I Lost Something</h2>
         </header>
 
         <section className="section">
@@ -132,11 +136,17 @@ function ReportLost() {
                 <input
                   id="location"
                   type="text"
-                  placeholder="e.g. Library, 2nd floor"
+                  list="campus-places"
+                  placeholder="Start typing, e.g. Library"
                   maxLength={150}
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                 />
+                <datalist id="campus-places">
+                  {APP_CONFIG.campusPlaces.map((p) => (
+                    <option key={p} value={p} />
+                  ))}
+                </datalist>
               </div>
 
               <div className="field">

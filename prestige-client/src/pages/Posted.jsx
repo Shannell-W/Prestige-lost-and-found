@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { API_URL, apiFetch } from "../api";
 import ClaimPrice from "../components/ClaimPrice";
-import UnreadBadge from "../components/UnreadBadge";
+import PickupDetails from "../components/PickupDetails";
+import { StatusBadge } from "../labels";
+import { imageSrc } from "../media";
+import Sidebar from "../components/Sidebar";
 
 function Posted() {
-  const user = JSON.parse(localStorage.getItem("user"));
   const [items, setItems] = useState([]);
   const [claimsByItem, setClaimsByItem] = useState({});
   const [loading, setLoading] = useState(true);
@@ -30,7 +32,7 @@ function Posted() {
       setItems(data);
       setLoading(false);
 
-      const claimedItems = data.filter((i) => i.status === "CLAIMED");
+      const claimedItems = data.filter((i) => i.status === "CLAIMED" || i.status === "RETURNED");
       for (const item of claimedItems) {
         loadClaimsForItem(item.id);
       }
@@ -84,38 +86,9 @@ function Posted() {
     }
   }
 
-  function logout() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    window.location.href = "/";
-  }
-
   return (
     <div className="dashboard-layout">
-      <aside className="sidebar glass">
-        <div className="sidebar-brand">
-          <div className="brand-mark">CLF</div>
-          <div>
-            <strong>Campus Lost & Found</strong>
-            <p>{user?.school || "School Portal"}</p>
-          </div>
-        </div>
-
-        <nav className="sidebar-nav">
-          <a href="/dashboard">Dashboard</a>
-          <a href="/items">Browse Items</a>
-          <a href="/report">Report Found Item</a>
-          <a href="/report-lost">Report Lost Item</a>
-          <a href="/lost-reports">My Lost Reports</a>
-          <a href="/claims">My Claims</a>
-          <a href="/posted">My Posted Items</a>
-          <a href="/notifications">Notifications<UnreadBadge /></a>
-          <a href="/profile">Profile</a>
-          <button className="side-link danger" onClick={logout}>
-            Logout
-          </button>
-        </nav>
-      </aside>
+      <Sidebar />
 
       <main className="dashboard-main">
         <header className="dashboard-top glass">
@@ -135,14 +108,17 @@ function Posted() {
             !error &&
             items.map((item) => (
               <div key={item.id} className="glass" style={{ padding: "16px", marginBottom: "16px" }}>
+                {item.image_url && (
+                  <img src={imageSrc(item.image_url)} alt="" style={{ width: "96px", height: "96px", objectFit: "cover", borderRadius: "12px", float: "right" }} />
+                )}
                 <h3>{item.title}</h3>
                 <p>
-                  <strong>Status:</strong> {item.status} &nbsp;|&nbsp;
+                  <StatusBadge kind="item" status={item.status} /> &nbsp;
                   <strong> Category:</strong> {item.category} &nbsp;|&nbsp;
                   <strong> Location:</strong> {item.location}
                 </p>
 
-                {item.status === "CLAIMED" && (
+                {(item.status === "CLAIMED" || item.status === "RETURNED") && (
                   <div style={{ marginTop: "12px" }}>
                     <h4>Claims on this item</h4>
                     {!claimsByItem[item.id] && <p>Loading claims...</p>}
@@ -173,7 +149,11 @@ function Posted() {
                               }))
                             }
                           />
-                          <p><strong>Status:</strong> {claim.status}</p>
+                          {claim.check_answer && (
+                            <p><strong>Answer to your question:</strong> {claim.check_answer}</p>
+                          )}
+                          <p><StatusBadge kind="claim" status={claim.status} /></p>
+                          {claim.status === "APPROVED" && <PickupDetails claimId={claim.id} />}
 
                           {claim.status === "PENDING" && (
                             <div style={{ marginTop: "8px" }}>

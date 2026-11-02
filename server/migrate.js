@@ -16,6 +16,15 @@ const NEW_COLUMNS = [
   { table: "notifications", column: "item_id", definition: "INT NULL AFTER `message`" },
   { table: "claims", column: "offered_amount", definition: "DECIMAL(10,2) NULL AFTER `status`" },
   { table: "claims", column: "counter_amount", definition: "DECIMAL(10,2) NULL AFTER `offered_amount`" },
+  { table: "claims", column: "check_answer", definition: "TEXT NULL AFTER `counter_amount`" },
+  { table: "users", column: "phone", definition: "VARCHAR(20) NULL AFTER `password`" },
+  { table: "users", column: "alerts_email", definition: "TINYINT(1) NOT NULL DEFAULT 1 AFTER `phone`" },
+  { table: "users", column: "alerts_sms", definition: "TINYINT(1) NOT NULL DEFAULT 1 AFTER `alerts_email`" },
+  { table: "items", column: "handover", definition: "VARCHAR(20) NOT NULL DEFAULT 'FINDER' AFTER `image_url`" },
+  { table: "items", column: "handover_note", definition: "VARCHAR(255) NULL AFTER `handover`" },
+  { table: "items", column: "check_question", definition: "VARCHAR(255) NULL AFTER `handover_note`" },
+  { table: "notifications", column: "lost_report_id", definition: "INT NULL AFTER `item_id`" },
+  { table: "lost_reports", column: "reminded_at", definition: "DATETIME NULL AFTER `status`" },
 ];
 
 // The CREATE TABLE statements from schema.sql (comments and CREATE DATABASE / USE removed).
@@ -51,7 +60,17 @@ async function migrate(conn, database) {
       [database, table, column]
     );
     if (Number(found) === 0) {
-      await conn.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+      // "AFTER x" only places the column; drop it if x doesn't exist in this (older) table.
+      let def = definition;
+      const after = def.match(/AFTER `(\w+)`/);
+      if (after) {
+        const [[{ has }]] = await conn.query(
+          "SELECT COUNT(*) AS has FROM information_schema.columns WHERE table_schema = ? AND table_name = ? AND column_name = ?",
+          [database, table, after[1]]
+        );
+        if (Number(has) === 0) def = def.replace(after[0], "").trim();
+      }
+      await conn.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${def}`);
       done.push(`added ${table}.${column}`);
     }
   }

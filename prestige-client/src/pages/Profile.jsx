@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
 import { API_URL, apiFetch } from "../api";
-import UnreadBadge from "../components/UnreadBadge";
+import Sidebar from "../components/Sidebar";
 
 function Profile() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [phone, setPhone] = useState("");
+  const [alertsEmail, setAlertsEmail] = useState(true);
+  const [alertsSms, setAlertsSms] = useState(true);
+  const [saveMessage, setSaveMessage] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -23,6 +28,9 @@ function Profile() {
       })
       .then((data) => {
         setProfile(data);
+        setPhone(data.phone || "");
+        setAlertsEmail(Boolean(data.alerts_email));
+        setAlertsSms(Boolean(data.alerts_sms));
         setLoading(false);
       })
       .catch((err) => {
@@ -32,38 +40,35 @@ function Profile() {
       });
   }, []);
 
-  function logout() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    window.location.href = "/";
+  async function saveAlerts(e) {
+    e.preventDefault();
+    setSaveMessage("");
+    setSaving(true);
+    try {
+      const response = await apiFetch(`${API_URL}/api/profile`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+        body: JSON.stringify({ phone, alertsEmail, alertsSms }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setSaveMessage(data.error || "Could not save.");
+        return;
+      }
+      setProfile(data);
+      setPhone(data.phone || "");
+      setSaveMessage("Saved.");
+    } catch (err) {
+      console.error(err);
+      setSaveMessage("Could not connect to the server.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <div className="dashboard-layout">
-      <aside className="sidebar glass">
-        <div className="sidebar-brand">
-          <div className="brand-mark">CLF</div>
-          <div>
-            <strong>Campus Lost & Found</strong>
-            <p>{profile?.school || "School Portal"}</p>
-          </div>
-        </div>
-
-        <nav className="sidebar-nav">
-          <a href="/dashboard">Dashboard</a>
-          <a href="/items">Browse Items</a>
-          <a href="/report">Report Found Item</a>
-          <a href="/report-lost">Report Lost Item</a>
-          <a href="/lost-reports">My Lost Reports</a>
-          <a href="/claims">My Claims</a>
-          <a href="/posted">My Posted Items</a>
-          <a href="/notifications">Notifications<UnreadBadge /></a>
-          <a href="/profile">Profile</a>
-          <button className="side-link danger" onClick={logout}>
-            Logout
-          </button>
-        </nav>
-      </aside>
+      <Sidebar />
 
       <main className="dashboard-main">
         <header className="dashboard-top glass">
@@ -82,6 +87,35 @@ function Profile() {
               <p><strong>Email:</strong> {profile.email}</p>
               <p><strong>Joined:</strong> {new Date(profile.created_at).toLocaleDateString()}</p>
             </div>
+          )}
+
+          {!loading && !error && profile && (
+            <form className="form glass" onSubmit={saveAlerts} style={{ padding: "20px", maxWidth: "400px", marginTop: "18px" }}>
+              <h3>How should we tell you?</h3>
+              <p className="muted">
+                When a possible match is found, someone claims your item, or there's a new price offer, we notify you here.
+                We can also email or text you, so you don't miss it.
+              </p>
+
+              <div className="field">
+                <label htmlFor="phone">Phone for SMS (optional)</label>
+                <input id="phone" type="tel" placeholder="e.g. 0712 345 678" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              </div>
+
+              <label style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <input type="checkbox" checked={alertsEmail} onChange={(e) => setAlertsEmail(e.target.checked)} />
+                Email me ({profile.email})
+              </label>
+              <label style={{ display: "flex", gap: "8px", alignItems: "center", margin: "8px 0 14px" }}>
+                <input type="checkbox" checked={alertsSms} onChange={(e) => setAlertsSms(e.target.checked)} />
+                Text me {phone ? "" : "(add a phone number first)"}
+              </label>
+
+              {saveMessage && <p>{saveMessage}</p>}
+              <button className="btn btn-primary" type="submit" disabled={saving}>
+                {saving ? "Saving..." : "Save"}
+              </button>
+            </form>
           )}
         </section>
       </main>

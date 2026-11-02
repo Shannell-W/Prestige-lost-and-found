@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { API_URL, apiFetch } from "../api";
 import { ksh } from "../money";
 import Sidebar from "../components/Sidebar";
-
-const STATUS_CLASS = { OPEN: "claimed", RESOLVED: "returned", CLOSED: "closed" };
+import { StatusBadge } from "../labels";
 
 function MyLostReports() {
   const [reports, setReports] = useState([]);
@@ -64,7 +63,7 @@ function MyLostReports() {
             >
               <div className="toolbar" style={{ marginTop: 0, marginBottom: "6px" }}>
                 <h3>{r.title}</h3>
-                <span className={`status-badge status-${STATUS_CLASS[r.status] || "closed"}`}>{r.status}</span>
+                <StatusBadge kind="report" status={r.status} />
               </div>
               <p className="item-meta">
                 {r.category} · lost {new Date(r.date_lost).toLocaleDateString()}

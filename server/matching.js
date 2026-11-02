@@ -18,6 +18,7 @@
 
 const MIN_SCORE = 4;
 const DATE_SLACK_DAYS = 2;
+const { addNotification } = require("./notify");
 const MAX_MATCHES = 10;
 
 const STOPWORDS = new Set(
@@ -209,11 +210,12 @@ async function notifyOwnersOfNewItem(conn, item) {
     );
     if (result.affectedRows === 0) continue; // already told them about this item
 
-    await conn.query("INSERT INTO notifications (user_id, message, item_id) VALUES (?, ?, ?)", [
+    await addNotification(
+      conn,
       report.student_id,
       `A found item that may be your lost "${report.title}" was just reported: "${item.title}". Open it to check and claim it.`,
-      item.id,
-    ]);
+      { itemId: item.id, lostReportId: report.id }
+    );
     notified += 1;
   }
   return notified;

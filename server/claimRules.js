@@ -5,6 +5,7 @@
 // Claim status:      PENDING -> APPROVED or REJECTED
 const { withTransaction } = require("./db");
 const { resolveReportsForApprovedClaim } = require("./matching");
+const { addNotification } = require("./notify");
 
 // An error with an HTTP status, so routes can turn it straight into a response.
 class HttpError extends Error {
@@ -19,8 +20,9 @@ class HttpError extends Error {
 const CLAIM_FEE_CENTS = Number(process.env.CLAIM_FEE_CENTS || 10000);
 
 // itemId is optional; when given, the website links the notification to the item.
+// Also sent by email/SMS if the student wants that (notify.js, alerts.js).
 async function notify(conn, userId, message, itemId = null) {
-  await conn.query("INSERT INTO notifications (user_id, message, item_id) VALUES (?, ?, ?)", [userId, message, itemId]);
+  await addNotification(conn, userId, message, { itemId });
 }
 
 // After a claim changes, set the item's status from what its claims now say.
@@ -45,7 +47,7 @@ async function refreshItemStatus(conn, itemId) {
 
 // A student claims an item. Returns the new claim's id.
 // offeredAmount (KSh, optional) is what the claimant offers to pay the finder.
-async function submitClaim({ itemId, userId, evidence, offeredAmount = null }) {
+async function submitClaim({ itemId, userId, evidence, offeredAmount = null, checkAnswer = null }) {
   return withTransaction(async (conn) => {
     const [[item]] = await conn.query("SELECT * FROM items WHERE id = ?", [itemId]);
     if (!item) throw new HttpError(404, "item not found");
@@ -64,8 +66,8 @@ async function submitClaim({ itemId, userId, evidence, offeredAmount = null }) {
     if (existing.length > 0) throw new HttpError(409, "You have already claimed this item");
 
     const [result] = await conn.query(
-      "INSERT INTO claims (item_id, student_id, evidence, status, offered_amount) VALUES (?, ?, ?, 'PENDING', ?)",
-      [itemId, userId, evidence, offeredAmount]
+      "INSERT INTO claims (item_id, student_id, evidence, status, offered_amount, check_answer) VALUES (?, ?, ?, 'PENDING', ?, ?)",
+      [itemId, userId, evidence, offeredAmount, checkAnswer]
     );
 
     // This was the missing step: the item now has a claim waiting for review,
@@ -109,7 +111,7 @@ async function setClaimStatus(claimId, newStatus) {
       );
       for (const other of losers) {
         await conn.query("UPDATE claims SET status = 'REJECTED' WHERE id = ?", [other.id]);
-        await notify(conn, other.student_id, `Your claim for "${claim.title}" was rejected.`);
+        await notify(conn, other.student_id, `Your claim for "${claim.title}" was rejected.`, claim.item_id);
       }
 
       const [fee] = await conn.query("SELECT id FROM fees WHERE claim_id = ?", [claimId]);
@@ -136,7 +138,8 @@ async function setClaimStatus(claimId, newStatus) {
 
     await refreshItemStatus(conn, claim.item_id);
     if (newStatus !== "PENDING") {
-      await notify(conn, claim.student_id, `Your claim for "${claim.title}" was ${newStatus.toLowerCase()}.`);
+      const next = newStatus === "APPROVED" ? " Open My Claims to see how to collect it." : "";
+      await notify(conn, claim.student_id, `Your claim for "${claim.title}" was ${newStatus.toLowerCase()}.${next}`, claim.item_id);
     }
 
     const [[updated]] = await conn.query("SELECT * FROM claims WHERE id = ?", [claimId]);

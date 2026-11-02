@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { API_URL, apiFetch } from "../api";
-import UnreadBadge from "../components/UnreadBadge";
+import Sidebar from "../components/Sidebar";
 import ClaimPrice from "../components/ClaimPrice";
+import PickupDetails from "../components/PickupDetails";
+import { StatusBadge } from "../labels";
 
 function Claims() {
-  const user = JSON.parse(localStorage.getItem("user"));
   const [claims, setClaims] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -34,38 +35,9 @@ function Claims() {
       });
   }, []);
 
-  function logout() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    window.location.href = "/";
-  }
-
   return (
     <div className="dashboard-layout">
-      <aside className="sidebar glass">
-        <div className="sidebar-brand">
-          <div className="brand-mark">CLF</div>
-          <div>
-            <strong>Campus Lost & Found</strong>
-            <p>{user?.school || "School Portal"}</p>
-          </div>
-        </div>
-
-        <nav className="sidebar-nav">
-          <a href="/dashboard">Dashboard</a>
-          <a href="/items">Browse Items</a>
-          <a href="/report">Report Found Item</a>
-          <a href="/report-lost">Report Lost Item</a>
-          <a href="/lost-reports">My Lost Reports</a>
-          <a href="/claims">My Claims</a>
-          <a href="/posted">My Posted Items</a>
-          <a href="/notifications">Notifications<UnreadBadge /></a>
-          <a href="/profile">Profile</a>
-          <button className="side-link danger" onClick={logout}>
-            Logout
-          </button>
-        </nav>
-      </aside>
+      <Sidebar />
 
       <main className="dashboard-main">
         <header className="dashboard-top glass">
@@ -95,10 +67,15 @@ function Claims() {
                 <tbody>
                   {claims.map((c) => (
                     <tr key={c.id}>
-                      <td style={{ padding: "15px" }}>{c.title}</td>
+                      <td style={{ padding: "15px" }}>
+                        <a className="link" href={`/items/${c.item_id}`}>{c.title}</a>
+                      </td>
                       <td style={{ padding: "15px" }}>{c.category}</td>
                       <td style={{ padding: "15px" }}>{c.location}</td>
-                      <td style={{ padding: "15px" }}>{c.status}</td>
+                      <td style={{ padding: "15px", minWidth: "170px" }}>
+                        <StatusBadge kind="claim" status={c.status} />
+                        {c.status === "APPROVED" && <PickupDetails claimId={c.id} />}
+                      </td>
                       <td style={{ padding: "15px", minWidth: "240px" }}>
                         <ClaimPrice
                           claim={c}

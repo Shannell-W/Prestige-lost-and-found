@@ -6,9 +6,15 @@ function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [school, setSchool] = useState('');
+  const [error, setError] = useState('');
+
+  // Where to go after logging in, e.g. /login?next=/report-lost. Only paths on this site.
+  const next = new URLSearchParams(window.location.search).get('next');
+  const afterLogin = next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
 
   async function handleLogin(e) {
     e.preventDefault();
+    setError('');
 
     try {
       const response = await apiFetch(`${API_URL}/api/auth/login`, {
@@ -20,17 +26,17 @@ function Login() {
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data.error || "Login failed");
+        setError(data.error || "Login failed");
         return;
       }
 
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
 
-      window.location.href = "/dashboard";
+      window.location.href = afterLogin;
     } catch (error) {
       console.error(error);
-      alert("Could not connect to the server.");
+      setError("Could not connect to the server.");
     }
   }
 
@@ -82,6 +88,7 @@ function Login() {
             />
           </div>
 
+          {error && <p role="alert" style={{ color: "var(--danger)" }}>{error}</p>}
           <button className="btn btn-primary full" type="submit">Login</button>
         </form>
 

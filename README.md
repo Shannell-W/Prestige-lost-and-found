@@ -258,7 +258,7 @@ npm run seed
 
 In PowerShell, `<` doesn't work. Use `Get-Content schema.sql | mysql -u root -p` instead, or paste the contents of `schema.sql` into the MySQL Command Line Client.
 
-**Already have a database from before lost reports?** Don't drop it. Run `npm run migrate` instead: it adds the new tables (`lost_reports`, `lost_report_matches`) and columns (`notifications.item_id`, `claims.offered_amount`, `claims.counter_amount`) and keeps your data. It is safe to run more than once.
+**Already have a database from before lost reports?** Don't drop it. Run `npm run migrate` instead: it adds the new tables (`lost_reports`, `lost_report_matches`) and columns (and all the new columns) and keeps your data. It is safe to run more than once.
 
 Start it:
 
@@ -312,7 +312,22 @@ A student who lost something reports it at **Report Lost Item** (`/report-lost`)
 - The sidebar shows the number of **unread notifications**; opening Notifications marks them read.
 - **Browse Items** has search plus category, status, school, location and date filters, starting on the student's own school.
 
-Website routes (all need a login): `POST /api/lost-reports`, `GET /api/lost-reports`, `GET /api/lost-reports/:id`, `GET /api/lost-reports/:id/matches`, `PATCH /api/lost-reports/:id` (`{"status":"CLOSED"|"OPEN"}`). `GET /api/items` also accepts `category`, `location`, `dateFrom`, `dateTo`. `POST /api/claims` accepts an optional `offeredAmount` (KSh). Price: `PATCH /api/claims/:id/offer` and `POST /api/claims/:id/accept-counter` (claimant), `PATCH /api/claims/:id/counter` (finder), each with `{"amount": 250}` where needed. Notifications: `GET /api/notifications/unread-count`, `POST /api/notifications/read-all`, `PATCH /api/notifications/:id/read`. The partner API is unchanged.
+### Making it easy for both sides
+
+- **Home and Dashboard** lead with two big buttons, **I lost something** and **I found something**. Logging in returns you to where you were going.
+- **Alerts by email and SMS** (optional): every notification can also be emailed (Resend) and texted (Africa's Talking). Students add a phone and choose on their **Profile**. Off until the keys are set in `server/.env` (see `.env.example`).
+- **Found-item form for phones**: photo (taken with the camera, shrunk in the browser before upload), what, where (with a list of common campus places), date (today by default), and where the owner collects it. Description, reward and a **check question** are folded under "More details".
+- **Where to collect it**: the finder says whether it's with **campus security** or with them, plus private pickup details. Once the claim is approved, both sides see the pickup details and each other's contact under **How to hand over / collect**.
+- **Check question**: a question only the owner can answer ("What's on the keychain?"). Claimants must answer it; the finder sees the answer next to the proof.
+- **Demand**: right after posting, the finder sees how many students are looking for something like it.
+- **"Still looking?" reminders** every 30 days while a lost report is open.
+- **Plain status words** ("Waiting for owner", "Claim under review", "Returned to owner"; "Still looking", "Got it back").
+- One shared sidebar on every portal page (`components/Sidebar.jsx`); Browse Items uses it when you're logged in.
+- **Real statistics** on the Home page (`GET /api/statistics/summary`).
+
+Photos are served openly at `/uploads/<random name>` (an `<img>` can't send an API key), like the docs. Only real JPEG/PNG/WebP files up to 3 MB are accepted, from logged-in students.
+
+Website routes (all need a login): `POST /api/lost-reports`, `GET /api/lost-reports`, `GET /api/lost-reports/:id`, `GET /api/lost-reports/:id/matches`, `PATCH /api/lost-reports/:id` (`{"status":"CLOSED"|"OPEN"}`). `GET /api/items` also accepts `category`, `location`, `dateFrom`, `dateTo`. `POST /api/claims` accepts an optional `offeredAmount` (KSh). Price: `PATCH /api/claims/:id/offer` and `POST /api/claims/:id/accept-counter` (claimant), `PATCH /api/claims/:id/counter` (finder), each with `{"amount": 250}` where needed. Notifications: `GET /api/notifications/unread-count`, `POST /api/notifications/read-all`, `PATCH /api/notifications/:id/read`. Settings: `PATCH /api/profile` (`phone`, `alertsEmail`, `alertsSms`). Pickup: `GET /api/claims/:id/handover`. Photos: `POST /api/uploads`. `POST /api/items` also takes `handover` (`FINDER`/`SECURITY`), `handoverNote`, `checkQuestion` and returns `lookingCount`; `POST /api/claims` takes `checkAnswer`; `POST /api/auth/register` takes an optional `phone`. The partner API is unchanged.
 
 ## Our upstream partner (Week 10)
 
@@ -343,6 +358,10 @@ server/matching.js         how lost reports are matched with found items (scorin
 server/migrate.js          `npm run migrate`: updates an existing database
 server/routes/offers.js    agreeing a price on a claim (offer, counter-offer, accept)
 server/routes/notifications.js  unread count, mark as read
+server/routes/account.js   alert settings, pickup details after approval, Home statistics
+server/routes/uploads.js   photo uploads
+server/alerts.js           email/SMS alerts;  server/notify.js  creates every notification
+server/reminders.js        "still looking?" reminders
 server/claimRules.js       claim rules shared by both
 server/db.js               MySQL connection
 server/schema.sql          tables;  server/seed.js  sample data

@@ -3,6 +3,8 @@ import { useParams } from "react-router-dom";
 import { API_URL, apiFetch } from "../api";
 import { ksh } from "../money";
 import Sidebar from "../components/Sidebar";
+import { StatusBadge } from "../labels";
+import { imageSrc } from "../media";
 
 // One of my lost reports, with the found items that look like it (best match first).
 function LostReportMatches() {
@@ -84,7 +86,7 @@ function LostReportMatches() {
                   <p className="muted">You lost</p>
                   <h3>{report.title}</h3>
                 </div>
-                <span className={`status-badge status-${statusClass(report.status)}`}>{report.status}</span>
+                <StatusBadge kind="report" status={report.status} />
               </div>
               <p>
                 <strong>Category:</strong> {report.category}
@@ -130,7 +132,7 @@ function LostReportMatches() {
               <div className="item-grid">
                 {matches.map((m) => (
                   <article key={m.id} className="item-card glass" style={{ padding: "18px" }}>
-                    {m.image_url && <img src={m.image_url} alt={m.title} />}
+                    {m.image_url && <img src={imageSrc(m.image_url)} alt={m.title} />}
                     <span className={`confidence-badge confidence-${m.confidence}`}>{m.confidence} match</span>
                     <h4 style={{ marginTop: "10px" }}>{m.title}</h4>
                     <p className="item-meta">
@@ -172,12 +174,6 @@ function LostReportMatches() {
       </main>
     </div>
   );
-}
-
-function statusClass(status) {
-  if (status === "OPEN") return "claimed";
-  if (status === "RESOLVED") return "returned";
-  return "closed";
 }
 
 export default LostReportMatches;
