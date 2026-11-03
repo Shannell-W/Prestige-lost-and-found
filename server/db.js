@@ -13,17 +13,22 @@ const pool = mysql.createPool({
 });
 
 // Run several queries as one all-or-nothing unit (for claims, where several tables change together).
+// Jobs added to conn.afterCommit (e.g. email/SMS alerts, see notify.js) run only once the transaction
+// has committed, so nobody is alerted about a change that was rolled back.
 async function withTransaction(work) {
   const conn = await pool.getConnection();
+  conn.afterCommit = [];
   try {
     await conn.beginTransaction();
     const result = await work(conn);
     await conn.commit();
+    for (const job of conn.afterCommit) job();
     return result;
   } catch (err) {
     await conn.rollback();
     throw err;
   } finally {
+    delete conn.afterCommit;
     conn.release();
   }
 }

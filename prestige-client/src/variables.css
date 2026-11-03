@@ -18,6 +18,14 @@
 
   --container: 1180px;
   --transition: 0.25s ease;
+
+  /* These were used in styles.css / animations.css but never defined, which hid the Home page's
+     fade-in sections (opacity stayed 0) and made primary/secondary buttons lose their colour on hover. */
+  --transition-slow: 0.5s;
+  --primary-dark: #7c3d14;
+  --secondary-dark: #a8861c;
+  --shadow-lg: 0 18px 40px rgba(75, 43, 25, 0.18);
+  --muted: #7a5c48;
 }
 
 body.dark {

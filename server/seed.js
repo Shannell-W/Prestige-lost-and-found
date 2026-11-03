@@ -56,6 +56,16 @@ async function seed(conn) {
      (3, 'Someone submitted a claim for your item "Scientific calculator".', 0, '2026-10-03 10:00:00'),
      (3, 'Someone submitted a claim for your item "Scientific calculator".', 0, '2026-10-03 11:30:00')`
   );
+
+  // Lost reports. student_id is the owner (users.id).
+  // Report 1: Amani lost her keys; it matches item 4 (house keys found at the main gate).
+  // Report 2: Brian lost a water bottle; nothing like it has been found yet.
+  await conn.query(
+    `INSERT INTO lost_reports (id, title, description, category, location, date_lost, reward_offered, status, student_id, school, created_at) VALUES
+     (1, 'Silver keys with torch', 'Bunch of three keys on a silver ring, small torch attached.', 'Other', 'Main gate', '2026-10-05', 200.00, 'OPEN', 1, 'Strathmore University', '2026-10-05 19:00:00'),
+     (2, 'Blue water bottle', 'Blue metal water bottle with a dented lid.', 'Other', 'Sports complex', '2026-10-07', 0.00, 'OPEN', 3, 'Strathmore University', '2026-10-07 18:00:00')`
+  );
+  await conn.query(`INSERT INTO lost_report_matches (lost_report_id, item_id, score) VALUES (1, 4, 11)`);
 }
 
 async function main() {
@@ -79,7 +89,7 @@ async function main() {
     await conn.beginTransaction();
     if (RESET) {
       // Children first, so foreign keys are never broken.
-      for (const table of ["refunds", "fees", "notifications", "claims", "items", "users"]) {
+      for (const table of ["lost_report_matches", "lost_reports", "refunds", "fees", "notifications", "claims", "items", "users"]) {
         await conn.query(`DELETE FROM ${table}`);
       }
     }

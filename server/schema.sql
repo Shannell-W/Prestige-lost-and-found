@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS users (
   school VARCHAR(150) NOT NULL,              -- school name, e.g. 'Strathmore University'
   email VARCHAR(160) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,            -- bcrypt hash, never the plain password
+  phone VARCHAR(20) NULL,                    -- optional, +2547XXXXXXXX, for SMS alerts
+  alerts_email TINYINT(1) NOT NULL DEFAULT 1,  -- send notifications by email too
+  alerts_sms TINYINT(1) NOT NULL DEFAULT 1,    -- send notifications by SMS too (needs a phone)
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -35,6 +38,9 @@ CREATE TABLE IF NOT EXISTS items (
   school VARCHAR(150) NOT NULL,
   reward_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,   -- in KSh
   image_url VARCHAR(500) NULL,
+  handover VARCHAR(20) NOT NULL DEFAULT 'FINDER',  -- where the owner collects it: FINDER (finder keeps it) or SECURITY (handed to campus security)
+  handover_note VARCHAR(255) NULL,           -- pickup details, shown only to the owner once their claim is approved
+  check_question VARCHAR(255) NULL,          -- a question only the owner can answer, asked when claiming
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_items_school_status (school, status),
   CONSTRAINT fk_items_finder FOREIGN KEY (student_id) REFERENCES users(id)
@@ -47,6 +53,9 @@ CREATE TABLE IF NOT EXISTS claims (
   student_id INT NOT NULL,                   -- the claimant: users.id
   evidence TEXT NOT NULL,                    -- why they believe it is theirs
   status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+  offered_amount DECIMAL(10,2) NULL,         -- what the claimant offers to pay the finder, in KSh (optional)
+  counter_amount DECIMAL(10,2) NULL,         -- the finder's counter-offer, waiting for the claimant's answer
+  check_answer TEXT NULL,                    -- the claimant's answer to items.check_question
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_claims_item (item_id),
   INDEX idx_claims_student_status (student_id, status),
@@ -58,6 +67,8 @@ CREATE TABLE IF NOT EXISTS notifications (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,                      -- who receives it: users.id
   message VARCHAR(500) NOT NULL,
+  item_id INT NULL,                          -- the found item this is about, if any (makes it clickable)
+  lost_report_id INT NULL,                   -- the lost report this is about, if any
   is_read TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_notifications_user (user_id, is_read),
@@ -89,4 +100,42 @@ CREATE TABLE IF NOT EXISTS refunds (
   reason VARCHAR(500) NOT NULL,
   refunded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_refunds_claim (claim_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------------------------------------------------------------------
+-- Lost reports: a student announces something they lost, so it can be matched
+-- against found items. Already have a database with data? Run `npm run migrate`
+-- instead of this file; it adds these tables and the new columns above.
+-- ---------------------------------------------------------------------------
+
+-- Status: OPEN (still looking), RESOLVED (their claim on a matching item was approved),
+-- CLOSED (the owner closed it, e.g. found it themselves).
+CREATE TABLE IF NOT EXISTS lost_reports (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(150) NOT NULL,
+  description TEXT,
+  category VARCHAR(50) NOT NULL,             -- same list as items.category
+  location VARCHAR(150) NULL,                -- where they think they lost it
+  date_lost DATE NOT NULL,
+  reward_offered DECIMAL(10,2) NOT NULL DEFAULT 0.00,  -- what the owner offers the finder, in KSh
+  status VARCHAR(20) NOT NULL DEFAULT 'OPEN',
+  reminded_at DATETIME NULL,                 -- last "still looking?" reminder (every 30 days while OPEN)
+  student_id INT NOT NULL,                   -- the owner: users.id
+  school VARCHAR(150) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_lost_reports_school_status (school, status),
+  INDEX idx_lost_reports_student (student_id),
+  CONSTRAINT fk_lost_reports_owner FOREIGN KEY (student_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Which found items have matched which lost reports, so an owner is notified once per item.
+CREATE TABLE IF NOT EXISTS lost_report_matches (
+  lost_report_id INT NOT NULL,
+  item_id INT NOT NULL,
+  score INT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (lost_report_id, item_id),
+  INDEX idx_matches_item (item_id),
+  CONSTRAINT fk_matches_report FOREIGN KEY (lost_report_id) REFERENCES lost_reports(id) ON DELETE CASCADE,
+  CONSTRAINT fk_matches_item FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

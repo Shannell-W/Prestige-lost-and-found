@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { API_URL, apiFetch } from "../api";
+import Sidebar from "../components/Sidebar";
 
 function Notifications() {
-  const user = JSON.parse(localStorage.getItem("user"));
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -29,6 +29,13 @@ function Notifications() {
       .then((data) => {
         setNotifications(data);
         setLoading(false);
+        // They've now been seen. The ones that were unread keep their "New" label until the page is left.
+        if (data.some((n) => !n.is_read)) {
+          apiFetch(`${API_URL}/api/notifications/read-all`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+          }).catch((err) => console.error(err));
+        }
       })
       .catch((err) => {
         console.error(err);
@@ -37,36 +44,9 @@ function Notifications() {
       });
   }, []);
 
-  function logout() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    window.location.href = "/";
-  }
-
   return (
     <div className="dashboard-layout">
-      <aside className="sidebar glass">
-        <div className="sidebar-brand">
-          <div className="brand-mark">CLF</div>
-          <div>
-            <strong>Campus Lost & Found</strong>
-            <p>{user?.school || "School Portal"}</p>
-          </div>
-        </div>
-
-        <nav className="sidebar-nav">
-          <a href="/dashboard">Dashboard</a>
-          <a href="/items">Browse Items</a>
-          <a href="/report">Report Found Item</a>
-          <a href="/claims">My Claims</a>
-          <a href="/posted">My Posted Items</a>
-          <a href="/notifications">Notifications</a>
-          <a href="/profile">Profile</a>
-          <button className="side-link danger" onClick={logout}>
-            Logout
-          </button>
-        </nav>
-      </aside>
+      <Sidebar />
 
       <main className="dashboard-main">
         <header className="dashboard-top glass">
@@ -92,7 +72,22 @@ function Notifications() {
                     opacity: n.is_read ? 0.6 : 1,
                   }}
                 >
-                  <p style={{ margin: 0 }}>{n.message}</p>
+                  <p style={{ margin: 0 }}>
+                    {!n.is_read && (
+                      <span className="status-badge status-claimed" style={{ marginRight: "8px", padding: "2px 8px" }}>New</span>
+                    )}
+                    {n.message}
+                  </p>
+                  {n.lost_report_id && (
+                    <a className="link" href={`/lost-reports/${n.lost_report_id}`} style={{ display: "inline-block", margin: "4px 12px 0 0" }}>
+                      {n.item_id ? "Compare with my report →" : "View my report →"}
+                    </a>
+                  )}
+                  {n.item_id && (
+                    <a className="link" href={`/items/${n.item_id}`} style={{ display: "inline-block", margin: "4px 12px 0 0" }}>
+                      View item →
+                    </a>
+                  )}
                   <small>
                     {new Date(n.created_at).toLocaleString()}
                   </small>

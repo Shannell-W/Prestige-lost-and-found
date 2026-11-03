@@ -7,6 +7,7 @@ function Register() {
   const [studentId, setStudentId] = useState("");
   const [school, setSchool] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -28,6 +29,7 @@ function Register() {
             studentId,
             school,
             email,
+            phone,
             password,
             confirmPassword,
           }),
@@ -47,6 +49,7 @@ function Register() {
       setStudentId("");
       setSchool("");
       setEmail("");
+      setPhone("");
       setPassword("");
       setConfirmPassword("");
     } catch (error) {
@@ -116,6 +119,17 @@ function Register() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+
+          <div className="field">
+            <label htmlFor="phone">Phone (optional, for SMS when your item is found)</label>
+            <input
+              id="phone"
+              type="tel"
+              placeholder="e.g. 0712 345 678"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
             />
           </div>
 
