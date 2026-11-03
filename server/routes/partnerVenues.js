@@ -12,6 +12,7 @@
 //
 // The browser never calls Team 4: it calls our /api/partner-venues, and our server calls them.
 const express = require("express");
+const { recordPartner } = require("../monitoring");
 
 const router = express.Router();
 const UNAVAILABLE = { error: "Partner data unavailable" };
@@ -76,6 +77,7 @@ router.get("/api/partner-venues", async (req, res) => {
     return res.json(cache.venues);
   }
 
+  recordPartner("call");
   try {
     const venues = await fetchFromPartner(s);
     if (venues) {
@@ -90,11 +92,14 @@ router.get("/api/partner-venues", async (req, res) => {
 
   // Partner failed (down, slow, 401, 429, changed shape). If we have an older answer, show it
   // rather than nothing, and say how old it is; otherwise show the friendly message.
+  recordPartner("failure");
   if (cache) {
+    recordPartner("stale");
     res.set("X-Partner-Data-Age", String(Math.round((Date.now() - cache.fetchedAt) / 1000)));
     res.set("X-Partner-Data-Stale", "true");
     return res.json(cache.venues);
   }
+  recordPartner("unavailable");
   return res.status(502).json(UNAVAILABLE);
 });
 

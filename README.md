@@ -4,11 +4,11 @@ Campus Lost & Found helps students get back things they lost at school. A studen
 
 This repository has three parts:
 
-| Folder | What it is |
-|---|---|
-| `prestige-client/` | The website (React + Vite), for students |
-| `server/` | The Express + MySQL server. It serves the website's data (`/api/...`) **and** the partner API below |
-| root `.md` files and `openapi.yaml` | Weekly lab documents and the API contract |
+| Folder                              | What it is                                                                                          |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `prestige-client/`                  | The website (React + Vite), for students                                                            |
+| `server/`                           | The Express + MySQL server. It serves the website's data (`/api/...`) **and** the partner API below |
+| root `.md` files and `openapi.yaml` | Weekly lab documents and the API contract                                                           |
 
 **Team:** Shannell Wanjiru (API Lead), Tony Kibe (Backend Dev), Raika Kanyiha (Integration/QA Lead), GuyTresor Gacheru (Docs/DevOps Lead)
 **Ring:** we consume Team 4's Artist Platform API; Team 6 (MoneyMentor Kenya) consumes ours.
@@ -21,18 +21,19 @@ The Prestige Lost & Found API gives claim statuses, reward amounts, fees, refund
 
 ### Base URL
 
-| Who | Base URL |
-|---|---|
-| Partner teams (from anywhere) | **`https://kenneth-resist-boxed-occurrence.trycloudflare.com`** (live from 28 October 2026) |
-| Our own team, on our own laptop | `http://localhost:5000` |
+| Who                             | Base URL                                                                                    |
+| ------------------------------- | ------------------------------------------------------------------------------------------- |
+| Partner teams (from anywhere)   | **`https://papers-relay-benefits-attention.trycloudflare.com`** (live from 3 November 2026) |
+| Our own team, on our own laptop | `http://localhost:5000`                                                                     |
 
 Add the endpoint path straight after the base URL, with **no `/api`**. For example, `GET /claims`:
 
 ```
-https://kenneth-resist-boxed-occurrence.trycloudflare.com/claims?status=claimed
+https://papers-relay-benefits-attention.trycloudflare.com/claims?status=claimed
 ```
 
 The public base URL is a Cloudflare tunnel to our server, which runs on our laptop. Please note:
+
 - It only works while our laptop, server and tunnel are running. Agree a testing time with us.
 - **The link changes whenever we restart the tunnel.** We'll message you the new one, and update this table.
 - Check it's up first (no key needed): `<base URL>/api/health` should return `{"message":"Prestige API is running"}`.
@@ -43,13 +44,21 @@ The public base URL is a Cloudflare tunnel to our server, which runs on our lapt
 Copy and paste, with your own key:
 
 ```
-curl -i -H "X-API-Key: <your-api-key>" "https://kenneth-resist-boxed-occurrence.trycloudflare.com/claims?status=claimed"
+curl -i -H "X-API-Key: <your-api-key>" "https://papers-relay-benefits-attention.trycloudflare.com/claims?status=claimed"
 ```
 
 Expected `200 OK`:
 
 ```json
-[{"claimId":"1","studentId":"SU-1001","itemId":"1","status":"claimed","rewardAmountCents":15000}]
+[
+  {
+    "claimId": "1",
+    "studentId": "SU-1001",
+    "itemId": "1",
+    "status": "claimed",
+    "rewardAmountCents": 15000
+  }
+]
 ```
 
 On Windows PowerShell, type `curl.exe` instead of `curl`. Pasting the address into a browser won't work, because a browser can't send the `X-API-Key` header: use curl, Postman, or your code.
@@ -100,109 +109,203 @@ Our own website's routes (`/api/...`) are separate. They also need the website's
 
 ### Endpoints
 
-| Method | Path | What it does | Success |
-|---|---|---|---|
-| GET | `/claims?status={status}` | List claims with a status, with reward amounts | 200 |
-| POST | `/claims` | Submit a claim on an item for a student | 201 |
-| PATCH | `/claims/{claimId}` | Set a claim's status (approving picks the owner) | 200 |
-| DELETE | `/claims/{claimId}` | Withdraw a claim | 204 |
-| GET | `/students/{studentId}/claims` | A student's claims and their status | 200 |
-| GET | `/schools/{schoolId}/item-statistics` | A school's lost-item totals | 200 |
-| GET | `/claims/{claimId}/fees` | The handling fee on an approved claim | 200 |
-| GET | `/claims/{claimId}/refunds` | Refunds on a claim | 200 |
-| POST | `/claims/{claimId}/refunds` | Refund part of a claim's fee | 201 |
+| Method | Path                                  | What it does                                     | Success |
+| ------ | ------------------------------------- | ------------------------------------------------ | ------- |
+| GET    | `/claims?status={status}`             | List claims with a status, with reward amounts   | 200     |
+| POST   | `/claims`                             | Submit a claim on an item for a student          | 201     |
+| PATCH  | `/claims/{claimId}`                   | Set a claim's status (approving picks the owner) | 200     |
+| DELETE | `/claims/{claimId}`                   | Withdraw a claim                                 | 204     |
+| GET    | `/students/{studentId}/claims`        | A student's claims and their status              | 200     |
+| GET    | `/schools/{schoolId}/item-statistics` | A school's lost-item totals                      | 200     |
+| GET    | `/claims/{claimId}/fees`              | The handling fee on an approved claim            | 200     |
+| GET    | `/claims/{claimId}/refunds`           | Refunds on a claim                               | 200     |
+| POST   | `/claims/{claimId}/refunds`           | Refund part of a claim's fee                     | 201     |
 
 Every example below is a real response from the server with the sample data from `npm run seed`. Your `submittedAt`/`refundedAt` times and new IDs will differ.
 
 #### List claims by status
+
 ```
 curl -i "http://localhost:5000/claims?status=pending"
 ```
+
 `200`:
+
 ```json
 [
-  {"claimId":"2","studentId":"SU-1001","itemId":"2","status":"pending","rewardAmountCents":10000},
-  {"claimId":"3","studentId":"SU-1002","itemId":"2","status":"pending","rewardAmountCents":10000}
+  {
+    "claimId": "2",
+    "studentId": "SU-1001",
+    "itemId": "2",
+    "status": "pending",
+    "rewardAmountCents": 10000
+  },
+  {
+    "claimId": "3",
+    "studentId": "SU-1002",
+    "itemId": "2",
+    "status": "pending",
+    "rewardAmountCents": 10000
+  }
 ]
 ```
+
 No claims with that status gives `200 []`. A missing or unknown status gives `400 {"error":"status query parameter is required"}`.
 
 #### A student's claims
+
 ```
 curl -i http://localhost:5000/students/SU-1001/claims
 ```
+
 `200`:
+
 ```json
 [
-  {"claimId":"1","itemId":"1","status":"claimed","submittedAt":"2026-10-01T06:15:00Z"},
-  {"claimId":"2","itemId":"2","status":"pending","submittedAt":"2026-10-03T07:00:00Z"}
+  {
+    "claimId": "1",
+    "itemId": "1",
+    "status": "claimed",
+    "submittedAt": "2026-10-01T06:15:00Z"
+  },
+  {
+    "claimId": "2",
+    "itemId": "2",
+    "status": "pending",
+    "submittedAt": "2026-10-03T07:00:00Z"
+  }
 ]
 ```
+
 A real student with no claims gives `200 []`. An unknown student gives `404 {"error":"student not found"}`.
 
 #### School statistics
+
 ```
 curl -i "http://localhost:5000/schools/Strathmore%20University/item-statistics"
 ```
+
 `200`:
+
 ```json
-{"schoolId":"Strathmore University","schoolName":"Strathmore University","totalItemsReported":4,"totalItemsClaimed":1,"totalRewardAmountPaidCents":15000}
+{
+  "schoolId": "Strathmore University",
+  "schoolName": "Strathmore University",
+  "totalItemsReported": 4,
+  "totalItemsClaimed": 1,
+  "totalRewardAmountPaidCents": 15000
+}
 ```
+
 `totalItemsClaimed` counts items returned to their owner. An unknown school gives `404 {"error":"school not found"}`.
 
 #### Fee on a claim
+
 ```
 curl -i http://localhost:5000/claims/1/fees
 ```
+
 `200`:
+
 ```json
-{"claimId":"1","studentId":"SU-1001","itemId":"1","amountPayableCents":10000}
+{
+  "claimId": "1",
+  "studentId": "SU-1001",
+  "itemId": "1",
+  "amountPayableCents": 10000
+}
 ```
+
 A fee exists only after a claim is approved: `GET /claims/2/fees` gives `404 {"error":"no fee has been charged on this claim yet"}`. An unknown claim gives `404 {"error":"claim not found"}`.
 
 #### Refunds on a claim
+
 ```
 curl -i http://localhost:5000/claims/1/refunds
 ```
+
 `200`:
+
 ```json
-[{"refundId":"1","claimId":"1","studentId":"SU-1001","amountCents":2500,"reason":"Item returned with a broken zip; partial refund issued.","refundedAt":"2026-10-08T13:30:00Z"}]
+[
+  {
+    "refundId": "1",
+    "claimId": "1",
+    "studentId": "SU-1001",
+    "amountCents": 2500,
+    "reason": "Item returned with a broken zip; partial refund issued.",
+    "refundedAt": "2026-10-08T13:30:00Z"
+  }
+]
 ```
 
 #### Submit a claim
+
 ```
 curl -i -X POST http://localhost:5000/claims -H "Content-Type: application/json" -d "{\"studentId\":\"SU-1001\",\"itemId\":\"3\"}"
 ```
+
 `201`:
+
 ```json
-{"claimId":"4","studentId":"SU-1001","itemId":"3","status":"pending","rewardAmountCents":0}
+{
+  "claimId": "4",
+  "studentId": "SU-1001",
+  "itemId": "3",
+  "status": "pending",
+  "rewardAmountCents": 0
+}
 ```
+
 Body: `studentId` (string, required), `itemId` (string, required), `evidence` (string, optional). Errors: `400` missing or wrong-type field; `404` unknown student or item; `409` the student found the item, it was already returned, or they already claimed it (`{"error":"You have already claimed this item"}`).
 
 #### Approve or reject a claim
+
 ```
 curl -i -X PATCH http://localhost:5000/claims/2 -H "Content-Type: application/json" -d "{\"status\":\"claimed\"}"
 ```
+
 `200`:
+
 ```json
-{"claimId":"2","studentId":"SU-1001","itemId":"2","status":"claimed","rewardAmountCents":10000}
+{
+  "claimId": "2",
+  "studentId": "SU-1001",
+  "itemId": "2",
+  "status": "claimed",
+  "rewardAmountCents": 10000
+}
 ```
+
 Approving makes this student the owner: the other pending claim on the item becomes `rejected`, the item is marked returned, and a fee is recorded. Sending the same status twice changes nothing. Errors: `400` invalid status; `404` unknown claim; `409` another claim on the item is already approved.
 
 #### Withdraw a claim
+
 ```
 curl -i -X DELETE http://localhost:5000/claims/4
 ```
+
 `204` with no body. `404 {"error":"claim not found"}` if it doesn't exist.
 
 #### Refund part of a fee
+
 ```
 curl -i -X POST http://localhost:5000/claims/1/refunds -H "Content-Type: application/json" -d "{\"studentId\":\"SU-1001\",\"amountCents\":1000,\"reason\":\"Collected late because the office was closed.\"}"
 ```
+
 `201`:
+
 ```json
-{"refundId":"2","claimId":"1","studentId":"SU-1001","amountCents":1000,"reason":"Collected late because the office was closed.","refundedAt":"2026-10-27T09:42:45Z"}
+{
+  "refundId": "2",
+  "claimId": "1",
+  "studentId": "SU-1001",
+  "amountCents": 1000,
+  "reason": "Collected late because the office was closed.",
+  "refundedAt": "2026-10-27T09:42:45Z"
+}
 ```
+
 Errors: `400` missing or invalid field, or `studentId` isn't the claimant; `404` unknown claim; `409` the claim has no fee, or the total refunded would be more than the fee.
 
 ### Errors
@@ -210,19 +313,83 @@ Errors: `400` missing or invalid field, or `studentId` isn't the claimant; `404`
 Every error has the same shape:
 
 ```json
-{"error": "claim not found"}
+{ "error": "claim not found" }
 ```
 
-| Status | Meaning |
-|---|---|
-| 400 | A field is missing or has the wrong type, or the body isn't valid JSON |
-| 401 | The `X-API-Key` header is missing or the key isn't valid |
-| 404 | No claim, student, item or school with that ID, or no such path |
-| 409 | The request conflicts with the current state (see each endpoint) |
-| 429 | More than 100 requests with your key in a minute. Wait `Retry-After` seconds |
-| 500 | Our bug. Tell us the time and the request you sent |
+| Status | Meaning                                                                      |
+| ------ | ---------------------------------------------------------------------------- |
+| 400    | A field is missing or has the wrong type, or the body isn't valid JSON       |
+| 401    | The `X-API-Key` header is missing or the key isn't valid                     |
+| 404    | No claim, student, item or school with that ID, or no such path              |
+| 409    | The request conflicts with the current state (see each endpoint)             |
+| 429    | More than 100 requests with your key in a minute. Wait `Retry-After` seconds |
+| 500    | Our bug. Tell us the time and the request you sent                           |
 
 ---
+
+## Monitoring (Week 12)
+
+Every request is logged as one line of JSON in the server's terminal: time, method, path (never the query string), status, time taken in milliseconds, and who called it. "Who" is a 6-character fingerprint of the API key (`key-1712ec`) plus the key's name (`team6`), never the key itself. Requests rejected with 401 or 429 are logged too, because the logger runs before the key check.
+
+```
+{"time":"2026-11-03T16:57:01.968Z","method":"GET","path":"/claims","status":200,"ms":17.3,"caller":"key-1712ec","consumer":"prestige-team"}
+{"time":"2026-11-03T16:57:01.983Z","method":"GET","path":"/claims","status":401,"ms":1.7,"caller":"none","consumer":null}
+```
+
+To keep a copy in a file (PowerShell): `node index.js | Tee-Object -FilePath requests.log` (Mac/Linux: `node index.js | tee requests.log`). `*.log` is in `.gitignore`.
+
+### GET /stats
+
+Running totals since the server started. Needs an API key like every other route.
+
+```
+curl -s -H "X-API-Key: <your-api-key>" http://localhost:5000/stats
+```
+
+`200`:
+
+```json
+{
+  "startedAt": "2026-11-03T16:56:54.999Z",
+  "uptimeSeconds": 26,
+  "total": 323,
+  "clientErrors": 219,
+  "serverErrors": 0,
+  "errorRatePercent": 0,
+  "avgMs": 2.6,
+  "routes": {
+    "GET /claims": {
+      "count": 35,
+      "clientErrors": 12,
+      "serverErrors": 0,
+      "avgMs": 3.5,
+      "maxMs": 17.3
+    },
+    "GET /schools/:schoolId/item-statistics": {
+      "count": 18,
+      "clientErrors": 0,
+      "serverErrors": 0,
+      "avgMs": 7.4,
+      "maxMs": 17.5
+    },
+    "GET (no route)": {
+      "count": 178,
+      "clientErrors": 178,
+      "serverErrors": 0,
+      "avgMs": 1,
+      "maxMs": 5.9
+    }
+  },
+  "partner": { "calls": 0, "failures": 0, "staleServed": 0, "unavailable": 0 }
+}
+```
+
+- `clientErrors` / `serverErrors`: 4xx (usually the caller's mistake) and 5xx (ours). `errorRatePercent` counts 5xx only.
+- `routes` groups by route pattern, so `/claims/1/fees` and `/claims/2/fees` share one row. `(no route)` holds requests that never reached a route: 401 and 429 rejected earlier, and 404s for unknown paths. The log lines tell them apart.
+- `partner` (Week 11 stretch): calls to Team 4's venues API, failures, how often we served the saved copy instead (`staleServed`), and how often there was nothing to show (`unavailable`).
+- The numbers live in memory and reset when the server restarts.
+
+To generate traffic: `node traffic.js http://localhost:5000 <your-api-key> 60` (in `server/`).
 
 ## Running it locally
 
@@ -258,6 +425,8 @@ npm run seed
 
 In PowerShell, `<` doesn't work. Use `Get-Content schema.sql | mysql -u root -p` instead, or paste the contents of `schema.sql` into the MySQL Command Line Client.
 
+**No `mysql` command on your PATH?** Run `npm run setup-db` instead of the `mysql` line. It reads `schema.sql` and your login from `server/.env` and creates the database through Node.
+
 **Already have a database from before lost reports?** Don't drop it. Run `npm run migrate` instead: it adds the new tables (`lost_reports`, `lost_report_matches`) and columns (and all the new columns) and keeps your data. It is safe to run more than once.
 
 Start it:
@@ -280,12 +449,12 @@ npm run dev
 
 Open the address it prints (usually http://localhost:5173). Sample logins, all with password `password123`:
 
-| Email | School |
-|---|---|
-| amani@strathmore.test | Strathmore University |
+| Email                   | School                |
+| ----------------------- | --------------------- |
+| amani@strathmore.test   | Strathmore University |
 | wanjiku@strathmore.test | Strathmore University |
-| brian@strathmore.test | Strathmore University |
-| faith@ku.test | Kenyatta University |
+| brian@strathmore.test   | Strathmore University |
+| faith@ku.test           | Kenyatta University   |
 
 The website needs its own key: copy `prestige-client/.env.example` to `prestige-client/.env` and set `VITE_API_KEY` to the `prestige-web` key from `server/.env`. Restart `npm run dev` after changing it. To point the website at a different server (e.g. a deployed one), set `VITE_API_URL` in the same file.
 

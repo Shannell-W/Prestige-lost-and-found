@@ -14,6 +14,13 @@ const path = require("path");
 
 const app = express();
 
+// =========================
+// MONITORING (Week 12, monitoring.js): FIRST, so every request is logged and counted,
+// including ones rejected below with 401 (no key) or 429 (rate limit).
+// =========================
+const { monitor, statsHandler } = require("./monitoring");
+app.use(monitor);
+
 // Expose the partner-data headers (so the Venues page can say when it is showing a saved copy)
 // and the rate-limit headers (so the website can tell users when to try again).
 app.use(
@@ -82,6 +89,9 @@ app.get("/openapi.yaml", (req, res) => {
 
 app.use(requireApiKey);
 app.use(rateLimit);
+
+// Request counts, error rates and response times since the server started. Needs a key, like everything here.
+app.get("/stats", statsHandler);
 // Photo uploads need a bigger body limit than everything else, so they're parsed before the normal JSON limit.
 app.use(require("./routes/uploads")(authenticateToken));
 app.use(express.json());
