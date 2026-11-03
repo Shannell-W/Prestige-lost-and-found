@@ -11,18 +11,19 @@
 // and lets the page keep showing venues while the partner is down or waking up.
 //
 // The browser never calls Team 4: it calls our /api/partner-venues, and our server calls them.
-const express = require("express");
-const { fetchWithRetry } = require("../resilientFetch");
+const express = require('express');
+const { recordPartner } = require('../monitoring'); // Week 12 stretch
+const { fetchWithRetry } = require('../resilientFetch');
 
 const router = express.Router();
-const UNAVAILABLE = { error: "Partner data unavailable" };
+const UNAVAILABLE = { error: 'Partner data unavailable' };
 
 let cache = null; // { venues, fetchedAt }
 
 function settings() {
   return {
-    url: (process.env.PARTNER_URL || "").replace(/\/+$/, ""),
-    key: process.env.PARTNER_API_KEY || "",
+    url: (process.env.PARTNER_URL || '').replace(/\/+$/, ''),
+    key: process.env.PARTNER_API_KEY || '',
     cacheMs: Number(process.env.PARTNER_CACHE_MINUTES || 20) * 60 * 1000,
     timeoutMs: Number(process.env.PARTNER_TIMEOUT_MS || 20000),
   };
@@ -35,12 +36,12 @@ function toVenues(data) {
   if (!Array.isArray(data)) return null;
   const venues = [];
   for (const v of data) {
-    if (!v || typeof v !== "object") return null;
-    const name = typeof v.venueName === "string" ? v.venueName : v.name;
-    if (typeof name !== "string" || typeof v.capacity !== "number") return null;
+    if (!v || typeof v !== 'object') return null;
+    const name = typeof v.venueName === 'string' ? v.venueName : v.name;
+    if (typeof name !== 'string' || typeof v.capacity !== 'number') return null;
     const venue = { id: String(v.id), name, capacity: v.capacity };
-    if (typeof v.location === "string") venue.location = v.location;
-    if (typeof v.supportedGenres === "string") venue.genres = v.supportedGenres;
+    if (typeof v.location === 'string') venue.location = v.location;
+    if (typeof v.supportedGenres === 'string') venue.genres = v.supportedGenres;
     venues.push(venue);
   }
   return venues;
@@ -48,55 +49,75 @@ function toVenues(data) {
 
 async function fetchFromPartner({ url, key, timeoutMs }) {
   // Send a key only if we have one: the backend Team 4 gave us needs none; their contracted API does.
-  const headers = key ? { "x-api-key": key, Accept: "application/json" } : { Accept: "application/json" };
+  const headers = key
+    ? { 'x-api-key': key, Accept: 'application/json' }
+    : { Accept: 'application/json' };
   const r = await fetchWithRetry(
-       `${url}/api/venues`,
-       { headers },
-       { timeoutMs, retries: 2, delayMs: 200 }
-     );
+    `${url}/api/venues`,
+    { headers },
+    { timeoutMs, retries: 2, delayMs: 200 },
+  );
   if (!r.ok) {
     // Log the status only, never the key.
-    const wait = r.headers.get("retry-after");
-    console.error(`partner returned ${r.status}${r.status === 429 && wait ? ` (retry after ${wait}s)` : ""}`);
+    const wait = r.headers.get('retry-after');
+    console.error(
+      `partner returned ${r.status}${r.status === 429 && wait ? ` (retry after ${wait}s)` : ''}`,
+    );
     return null;
   }
   const venues = toVenues(await r.json());
-  if (!venues) console.error("partner response shape changed (expected id, venueName or name, capacity)");
+  if (!venues)
+    console.error(
+      'partner response shape changed (expected id, venueName or name, capacity)',
+    );
   return venues;
 }
 
-router.get("/api/partner-venues", async (req, res) => {
+router.get('/api/partner-venues', async (req, res) => {
   const s = settings();
   if (!s.url) {
-    console.error("PARTNER_URL is not set in server/.env");
+    console.error('PARTNER_URL is not set in server/.env');
     return res.status(502).json(UNAVAILABLE);
   }
 
   // Fresh enough: answer from memory without calling Team 4 (protects their 3-per-hour limit).
   if (cache && Date.now() - cache.fetchedAt < s.cacheMs) {
-    res.set("X-Partner-Data-Age", String(Math.round((Date.now() - cache.fetchedAt) / 1000)));
+    res.set(
+      'X-Partner-Data-Age',
+      String(Math.round((Date.now() - cache.fetchedAt) / 1000)),
+    );
     return res.json(cache.venues);
   }
+  recordPartner('call'); // Week 12: we're asking Team 4
 
   try {
     const venues = await fetchFromPartner(s);
     if (venues) {
       cache = { venues, fetchedAt: Date.now() };
-      res.set("X-Partner-Data-Age", "0");
+      res.set('X-Partner-Data-Age', '0');
       return res.json(venues);
     }
   } catch (err) {
-    const reason = err.name === "TimeoutError" ? `no response within ${s.timeoutMs}ms` : err.cause?.code || err.message;
-    console.error("partner call failed:", reason);
+    const reason =
+      err.name === 'TimeoutError'
+        ? `no response within ${s.timeoutMs}ms`
+        : err.cause?.code || err.message;
+    console.error('partner call failed:', reason);
   }
 
   // Partner failed (down, slow, 401, 429, changed shape). If we have an older answer, show it
   // rather than nothing, and say how old it is; otherwise show the friendly message.
+  recordPartner('failure'); // Week 12
   if (cache) {
-    res.set("X-Partner-Data-Age", String(Math.round((Date.now() - cache.fetchedAt) / 1000)));
-    res.set("X-Partner-Data-Stale", "true");
+    recordPartner('stale'); // Week 12: serving our saved copy
+    res.set(
+      'X-Partner-Data-Age',
+      String(Math.round((Date.now() - cache.fetchedAt) / 1000)),
+    );
+    res.set('X-Partner-Data-Stale', 'true');
     return res.json(cache.venues);
   }
+  recordPartner('unavailable'); // Week 12: nothing saved to show
   return res.status(502).json(UNAVAILABLE);
 });
 
