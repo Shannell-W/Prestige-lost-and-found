@@ -1,3 +1,4 @@
+
 -- Prestige Campus Lost & Found: database schema (MySQL 8)
 --
 -- Create everything:     mysql -u root -p < schema.sql
