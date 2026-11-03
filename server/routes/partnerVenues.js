@@ -12,6 +12,7 @@
 //
 // The browser never calls Team 4: it calls our /api/partner-venues, and our server calls them.
 const express = require("express");
+const { fetchWithRetry } = require("../resilientFetch");
 
 const router = express.Router();
 const UNAVAILABLE = { error: "Partner data unavailable" };
@@ -48,10 +49,11 @@ function toVenues(data) {
 async function fetchFromPartner({ url, key, timeoutMs }) {
   // Send a key only if we have one: the backend Team 4 gave us needs none; their contracted API does.
   const headers = key ? { "x-api-key": key, Accept: "application/json" } : { Accept: "application/json" };
-  const r = await fetch(`${url}/api/venues`, {
-    headers,
-    signal: AbortSignal.timeout(timeoutMs),
-  });
+  const r = await fetchWithRetry(
+       `${url}/api/venues`,
+       { headers },
+       { timeoutMs, retries: 2, delayMs: 200 }
+     );
   if (!r.ok) {
     // Log the status only, never the key.
     const wait = r.headers.get("retry-after");
