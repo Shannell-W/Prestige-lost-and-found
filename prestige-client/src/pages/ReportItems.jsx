@@ -3,6 +3,7 @@ import { APP_CONFIG } from "../config";
 import { API_URL, apiFetch } from "../api";
 import { shrinkImage, imageSrc } from "../media";
 import Sidebar from "../components/Sidebar";
+import PlaceSuggestions from "../components/PlaceSuggestions";
 
 // Report a found item. Made for a phone, in about 30 seconds: photo, what, where, and where the owner
 // collects it. Everything else is optional and folded away under "More details".
@@ -162,17 +163,13 @@ function ReportItems() {
                 <input
                   id="location"
                   type="text"
-                  list="campus-places"
+                  list="place-suggestions"
                   placeholder="Start typing, e.g. Library"
                   required
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                 />
-                <datalist id="campus-places">
-                  {APP_CONFIG.campusPlaces.map((p) => (
-                    <option key={p} value={p} />
-                  ))}
-                </datalist>
+                <PlaceSuggestions id="place-suggestions" />
               </div>
 
               <div className="field">

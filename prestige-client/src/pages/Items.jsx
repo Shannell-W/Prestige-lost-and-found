@@ -4,6 +4,7 @@ import { API_URL, apiFetch } from "../api";
 import { APP_CONFIG } from "../config";
 import { StatusBadge, statusLabel } from "../labels";
 import Sidebar from "../components/Sidebar";
+import PlaceSuggestions from "../components/PlaceSuggestions";
 
 // Filters start on the student's own school (everything, if not logged in).
 function initialFilters() {
@@ -107,10 +108,12 @@ function Items() {
               <input
                 id="locationFilter"
                 type="text"
-                placeholder="e.g. Library"
+                list="place-suggestions"
+                placeholder="e.g. Library or a venue"
                 value={filters.location}
                 onChange={(e) => setFilter("location", e.target.value)}
               />
+              <PlaceSuggestions id="place-suggestions" showNote={false} />
             </div>
 
             <div className="field">
