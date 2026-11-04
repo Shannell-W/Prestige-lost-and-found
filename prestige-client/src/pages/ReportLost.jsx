@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { APP_CONFIG } from "../config";
 import { API_URL, apiFetch } from "../api";
 import Sidebar from "../components/Sidebar";
+import PlaceSuggestions from "../components/PlaceSuggestions";
 
 // A student announces something they lost. If similar found items already exist they go
 // straight to them; otherwise they're told they'll be notified when one is reported.
@@ -136,17 +137,13 @@ function ReportLost() {
                 <input
                   id="location"
                   type="text"
-                  list="campus-places"
+                  list="place-suggestions"
                   placeholder="Start typing, e.g. Library"
                   maxLength={150}
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                 />
-                <datalist id="campus-places">
-                  {APP_CONFIG.campusPlaces.map((p) => (
-                    <option key={p} value={p} />
-                  ))}
-                </datalist>
+                <PlaceSuggestions id="place-suggestions" />
               </div>
 
               <div className="field">
