@@ -830,6 +830,8 @@ app.get("/api/statistics/lost-items", async (req, res) => {
 // =========================
 
 app.use(require("./routes/partnerVenues"));
+// Events at those venues (Team 4's bookings), shown on the Venues page. See routes/partnerEvents.js.
+app.use(require("./routes/partnerEvents"));
 
 // =========================
 // LOST REPORTS: announce a lost item, see similar found items, get notified (routes/lostReports.js)
