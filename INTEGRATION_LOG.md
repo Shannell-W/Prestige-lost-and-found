@@ -71,3 +71,16 @@ While preparing for Part E we also reviewed our own routes against our contract 
 | Saved copy | Reloaded the Venues page 5 times within 20 minutes | Each reload was instant; our server called Team 4 only once and answered the rest from its saved copy |
 | Partner down | Set `PARTNER_URL` to `https://wrong-address.onrender.com` and restarted our server | Venues page showed "Partner data is unavailable right now. Please try again later." Server terminal logged: 'partner returned 404'. `/api/health` still worked |
 | Recovery | Restored `PARTNER_URL` and restarted our server | All 4 venues loaded again with no code change |
+
+## Event dates on the Venues page (4 November)
+
+The Venues page showed Team 4's venues but not when anything happened there, so it didn't help a student who lost something at a show. Team 4's server has no events endpoint, but each **booking** is an artist at a venue on a date (`venueId`, `eventDate`, `status`), and `GET /api/artists` gives the artist names.
+
+| Change | Where |
+|---|---|
+| `GET /api/partner-events`: our server fetches Team 4's bookings and artists, leaves out Rejected bookings and ones with no date, and returns `{id, venueId, date, artist, status}`, newest first. Same 20-minute saved copy and fallback as the venues | `server/routes/partnerEvents.js` |
+| Venues page: an "Events" column with up to 3 dates per venue, the artist, and whether it was held or is upcoming | `prestige-client/src/pages/Venues.jsx` |
+| Tests with a stand-in Team 4 server: bookings + artists, rejected/undated left out, artists down (dates still shown), saved copy, renamed field | `server/__tests__/partner-events.test.js` (7 tests) |
+
+If only Team 4's artists call fails, the dates still show without artist names. If the bookings call fails and nothing is saved, the Events column says "Not available right now" and the venues still show.
+

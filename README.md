@@ -502,6 +502,8 @@ Website routes (all need a login): `POST /api/lost-reports`, `GET /api/lost-repo
 
 The **Partner Venues** page (`/venues`) shows venues from **Team 4**. Team 4 told us to use their deployed server, `https://artist-api-server.onrender.com` (`GET /api/venues`, no key needed).
 
+**Event dates:** the Venues page also shows when shows were held (or will be) at each venue, so a student who lost something at a concert can match the date. Team 4 has no events endpoint, so we use their **bookings** (`GET /api/bookings`: an artist at a venue on a date, with status Pending, Accepted, Rejected or Completed) and artist names (`GET /api/artists`). Our server combines them at `GET /api/partner-events`, leaving out rejected bookings and bookings with no date, and keeps the same 20-minute saved copy as the venues.
+
 - Our server calls Team 4; the page only ever calls our own `/api/partner-venues`.
 - Our server remembers Team 4's last answer for 20 minutes (`PARTNER_CACHE_MINUTES`). Render's free plan sleeps when idle, so this keeps the page fast and working while their server wakes up.
 - If Team 4 is down, slow (20-second limit) or changes their response, the page shows the last saved venues with a note saying how old they are, or "Partner data is unavailable right now" if nothing is saved yet. Our own pages keep working.
