@@ -14,6 +14,7 @@
 const express = require('express');
 const { recordPartner } = require('../monitoring'); // Week 12 stretch
 const { fetchWithRetry } = require('../resilientFetch');
+const { currentVersion } = require('../partner'); // Week 13: which version of Team 4's API, and its shape
 
 const router = express.Router();
 const UNAVAILABLE = { error: 'Partner data unavailable' };
@@ -29,31 +30,16 @@ function settings() {
   };
 }
 
-// Their response -> the fields our page needs. Returns null if the shape isn't what we expect,
-// so a renamed field shows our "unavailable" message instead of a table of blanks.
-// Accepts the backend's `venueName` or the contract's `name`.
-function toVenues(data) {
-  if (!Array.isArray(data)) return null;
-  const venues = [];
-  for (const v of data) {
-    if (!v || typeof v !== 'object') return null;
-    const name = typeof v.venueName === 'string' ? v.venueName : v.name;
-    if (typeof name !== 'string' || typeof v.capacity !== 'number') return null;
-    const venue = { id: String(v.id), name, capacity: v.capacity };
-    if (typeof v.location === 'string') venue.location = v.location;
-    if (typeof v.supportedGenres === 'string') venue.genres = v.supportedGenres;
-    venues.push(venue);
-  }
-  return venues;
-}
+// Week 13: the shape of Team 4's response now lives in ../partner.js (one parser per version).
 
 async function fetchFromPartner({ url, key, timeoutMs }) {
   // Send a key only if we have one: the backend Team 4 gave us needs none; their contracted API does.
   const headers = key
     ? { 'x-api-key': key, Accept: 'application/json' }
     : { Accept: 'application/json' };
+  const ver = currentVersion();
   const r = await fetchWithRetry(
-    `${url}/api/venues`,
+    `${url}${ver.path}`,
     { headers },
     { timeoutMs, retries: 2, delayMs: 200 },
   );
@@ -65,12 +51,13 @@ async function fetchFromPartner({ url, key, timeoutMs }) {
     );
     return null;
   }
-  const venues = toVenues(await r.json());
-  if (!venues)
-    console.error(
-      'partner response shape changed (expected id, venueName or name, capacity)',
-    );
-  return venues;
+  // The version's parser checks the shape and says what's wrong, instead of failing somewhere else.
+  try {
+    return ver.parse(await r.json());
+  } catch (err) {
+    console.error(`partner ${ver.name} response shape changed: ${err.message}`);
+    return null;
+  }
 }
 
 router.get('/api/partner-venues', async (req, res) => {

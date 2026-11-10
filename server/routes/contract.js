@@ -10,6 +10,7 @@
 const express = require("express");
 const { pool } = require("../db");
 const { HttpError, submitClaim, setClaimStatus, deleteClaim } = require("../claimRules");
+const { deprecated } = require("../deprecate");
 
 const router = express.Router();
 
@@ -65,8 +66,14 @@ function sendError(res, err) {
   throw err; // anything unexpected goes to the error handler in index.js (500)
 }
 
+// Week 13: v1 is FROZEN. Do not change the shape of anything this file returns.
+// The two list endpoints below have a v2 (routes/contractV2.js) that wraps the list in { data, count }.
+// Their v1 responses now carry Deprecation, Sunset and Link headers; the handlers are unchanged.
+// They answer at /claims (old URL, no version) and at /v1/claims (index.js mounts this router at both).
+const old = deprecated({ successor: (req) => `/v2${req.path}` });
+
 // ---------- GET /claims?status=claimed ----------
-router.get("/claims", async (req, res) => {
+router.get("/claims", old, async (req, res) => {
   const { status } = req.query;
   if (!status) return res.status(400).json({ error: "status query parameter is required" });
   if (!STATUSES.includes(status)) {
@@ -135,7 +142,7 @@ router.delete("/claims/:claimId", async (req, res) => {
 });
 
 // ---------- GET /students/:studentId/claims ----------
-router.get("/students/:studentId/claims", async (req, res) => {
+router.get("/students/:studentId/claims", old, async (req, res) => {
   const [[user]] = await pool.query("SELECT id FROM users WHERE student_id = ?", [req.params.studentId]);
   if (!user) return res.status(404).json({ error: "student not found" });
 
@@ -257,4 +264,6 @@ router.post("/claims/:claimId/refunds", async (req, res) => {
 });
 
 module.exports = router;
+// For v2 (routes/contractV2.js): the same queries and the same mapping, so both versions read the same data.
+module.exports.shared = { pool, STATUSES, TO_DB, FROM_DB, CLAIM_SELECT, claimToApi, iso };
 module.exports.iso = iso;
