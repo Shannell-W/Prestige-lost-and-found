@@ -98,7 +98,7 @@ Every response also has `RateLimit-Limit` and `RateLimit-Remaining` headers, so 
 
 Two list endpoints have a **v2** that wraps the list in `{ "data": [...], "count": N }`:
 
-| v1 (deprecated, sunset Mon 16 Nov 2026) | v2 (use this) |
+| v1 (deprecated, sunset end of Tue 10 Nov 2026) | v2 (use this) |
 |---|---|
 | `GET /claims?status=...` or `GET /v1/claims?status=...` → `[ {claim}, ... ]` | `GET /v2/claims?status=...` → `{ "data": [ {claim}, ... ], "count": N }` |
 | `GET /students/{studentId}/claims` or `/v1/...` → `[ {...}, ... ]` | `GET /v2/students/{studentId}/claims` → `{ "data": [ {...}, ... ], "count": N }` |

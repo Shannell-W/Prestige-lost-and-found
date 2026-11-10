@@ -3,7 +3,7 @@
 const { app, request, rawRequest, pool, resetDb } = require("../test/helpers");
 const { V1_SUNSET } = require("../deprecate");
 
-const SUNSET = new Date(`${V1_SUNSET}T00:00:00Z`).toUTCString(); // "Mon, 16 Nov 2026 00:00:00 GMT"
+const SUNSET = new Date(`${V1_SUNSET}T00:00:00Z`).toUTCString(); // "Wed, 11 Nov 2026 00:00:00 GMT"
 const CLAIM_FIELDS = ["claimId", "itemId", "rewardAmountCents", "status", "studentId"];
 const STUDENT_CLAIM_FIELDS = ["claimId", "itemId", "status", "submittedAt"];
 
