@@ -4,7 +4,7 @@ To: Team 6 (MoneyMentor Kenya), Njeri    From: Raika Kanyiha, Team 5 (Prestige) 
 
 ## Summary
 
-v1 of `GET /claims` and `GET /students/{studentId}/claims` is deprecated. v2 is live now. v1 of these two endpoints will stop working on **Monday 16 November 2026**. Please move before then.
+v1 of `GET /claims` and `GET /students/{studentId}/claims` is deprecated. v2 is live now. v1 of these two endpoints will stop working at the **end of Tuesday 10 November 2026** (Sunset: Wed, 11 Nov 2026 00:00 GMT), the day before Demo Day. Please move today, so both of us present on v2 tomorrow.
 
 ## What is changing
 
@@ -58,15 +58,15 @@ You can check you're still on v1: v1 responses now carry these headers.
 
 ```
 Deprecation: true
-Sunset: Mon, 16 Nov 2026 00:00:00 GMT
+Sunset: Wed, 11 Nov 2026 00:00:00 GMT
 Link: </v2/claims>; rel="successor-version"
 ```
 
 ## Timeline
 
 - **10 November 2026:** v2 is live. v1 still works, and now sends Deprecation headers.
-- **16 November 2026:** v1 of these two endpoints stops working. (In this course we'll keep v1 running until after Demo Day so nobody's demo breaks, but please plan for the 16th.)
+- **End of 10 November 2026:** v1 of these two endpoints is past its sunset. (In this course we'll keep v1 running until after Demo Day on 11 November so nobody's demo breaks, but please move to v2 before Demo Day.)
 
 ## Questions
 
-Message Raika on WhatsApp any time. I'll reply within a few hours.
+Message Raika on WhatsApp any time tonight. I'll reply within 30 minutes.

@@ -5,9 +5,10 @@
 // `successor` can be a fixed path, or a function of the request (so /students/SU-1001/claims
 // points at /v2/students/SU-1001/claims).
 
-// The ONE place our v1 sunset date lives. The day before Demo Day; v1 keeps running until after
-// Demo Day anyway, so nobody's demo breaks (course rule).
-const V1_SUNSET = "2026-11-16";
+// The ONE place our v1 sunset date lives. Demo Day is Wed 11 Nov, and the course rule is a sunset no later
+// than the day before, so v1 is deprecated from the end of Tue 10 Nov (= 2026-11-11 00:00 GMT).
+// v1 keeps running until after Demo Day anyway, so nobody's demo breaks (course rule).
+const V1_SUNSET = "2026-11-11";
 
 function deprecated({ sunset = V1_SUNSET, successor }) {
   const when = new Date(`${sunset}T00:00:00Z`).toUTCString();

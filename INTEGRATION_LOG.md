@@ -88,6 +88,6 @@ If only Team 4's artists call fails, the dates still show without artist names. 
 
 | # | Symptom | What changed | What we changed | Whose code |
 |---|---|---|---|---|
-| W13-1 | We shipped a breaking change to Team 6 | Our `GET /claims` and `GET /students/{id}/claims` lists are wrapped as `{ data, count }` in v2 | v2 beside v1; v1 unchanged but sends Deprecation, Sunset (16 Nov) and Link headers; notice sent ([date]) | Ours |
+| W13-1 | We shipped a breaking change to Team 6 | Our `GET /claims` and `GET /students/{id}/claims` lists are wrapped as `{ data, count }` in v2 | v2 beside v1; v1 unchanged but sends Deprecation, Sunset (end of 10 Nov) and Link headers; notice sent ([date]) | Ours |
 | W13-2 | Waiting for Team 4's deprecation notice | [what Team 4 changed] | Moved Team 4's response shape into `server/partner.js`, chosen by `PARTNER_VERSION`; [switched to their v2 on date] | Team 4's change, our migration. [This time nothing broke, because we were warned.] |
 
