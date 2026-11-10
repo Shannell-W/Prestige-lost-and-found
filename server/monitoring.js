@@ -51,7 +51,7 @@ function monitor(req, res, next) {
       JSON.stringify({
         time: new Date().toISOString(),
         method: req.method,
-        path: req.path, // path only: no query string
+        path: req.baseUrl + req.path, // path only, with its /v1 or /v2 prefix; no query string
         status: res.statusCode,
         ms: round(ms),
         caller: who(req),

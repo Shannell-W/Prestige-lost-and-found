@@ -94,6 +94,17 @@ Retry-After: 42
 
 Every response also has `RateLimit-Limit` and `RateLimit-Remaining` headers, so you can slow down before you hit the limit. If you call us from a page, save our answer for a minute rather than calling on every page load.
 
+### Versions: v1 and v2
+
+Two list endpoints have a **v2** that wraps the list in `{ "data": [...], "count": N }`:
+
+| v1 (deprecated, sunset Mon 16 Nov 2026) | v2 (use this) |
+|---|---|
+| `GET /claims?status=...` or `GET /v1/claims?status=...` → `[ {claim}, ... ]` | `GET /v2/claims?status=...` → `{ "data": [ {claim}, ... ], "count": N }` |
+| `GET /students/{studentId}/claims` or `/v1/...` → `[ {...}, ... ]` | `GET /v2/students/{studentId}/claims` → `{ "data": [ {...}, ... ], "count": N }` |
+
+The items inside the list, the `?status=` filter, errors and the API key are the same in both. v1 responses carry `Deprecation: true`, `Sunset` and a `Link` to the v2 URL. Every other endpoint is unchanged and has no v2: call it at its usual URL (or under `/v1/`). Details and migration steps: [`DEPRECATION_NOTICE.md`](./DEPRECATION_NOTICE.md).
+
 ### Our website's routes
 
 Our own website's routes (`/api/...`) are separate. They also need the website's API key, and actions like claiming an item also need a login token (`Authorization: Bearer <token>` from `POST /api/auth/login`). Partners don't need those routes.

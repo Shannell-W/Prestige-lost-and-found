@@ -850,7 +850,10 @@ app.use(require("./routes/account").router(authenticateToken));
 // PARTNER CONTRACT API (openapi.yaml) for Team 6
 // =========================
 
-app.use(contractRoutes);
+// Week 13: v2 beside v1, both behind the key check and rate limit above.
+app.use("/v2", require("./routes/contractV2")); // the new version: lists wrapped in { data, count }
+app.use("/v1", contractRoutes); // the old version, still running (and deprecated where v2 exists)
+app.use(contractRoutes); // old URLs with no version (/claims) keep working
 
 // Unknown paths: JSON, not Express's default HTML page
 app.use((req, res) => {
